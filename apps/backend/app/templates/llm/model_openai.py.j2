@@ -1,0 +1,11 @@
+# ── OpenAI LLM ────────────────────────────────────────────────────────────────
+import os
+from langchain_openai import ChatOpenAI
+
+llm_{{ node_id }} = ChatOpenAI(
+    model="{{ config.model | default('gpt-4o-mini') }}",
+    temperature={{ config.temperature | default(0.7) }},
+    max_tokens={{ config.max_tokens | default(1000) }},
+    openai_api_key=os.environ["{{ config.api_key_env | default('OPENAI_API_KEY') }}"],
+)
+print(f"[LLM] Initialized OpenAI {{ config.model | default('gpt-4o-mini') }}")

@@ -1,0 +1,105 @@
+import type { NodeDefinition } from '@ai-ide/types'
+
+export const llmChainNodes: NodeDefinition[] = [
+  {
+    id: 'llm.chain.rag',
+    category: 'chain',
+    pipeline: 'llm',
+    label: 'RAG Chain',
+    description: 'Retrieval-Augmented Generation — retrieve + answer',
+    icon: '🔗',
+    color: '#ec4899',
+    inputs: [
+      { id: 'vectorstore', label: 'Vector Store', type: 'VectorStore' },
+      { id: 'llm', label: 'LLM', type: 'Any' },
+    ],
+    outputs: [{ id: 'chain', label: 'RAG Chain', type: 'Any' }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        prompt_template: {
+          type: 'string',
+          title: 'Prompt Template',
+          default: 'Answer the question based on the context.\n\nContext: {context}\n\nQuestion: {question}',
+        },
+        retriever_k: { type: 'integer', title: 'Number of documents to retrieve (k)', default: 4 },
+        chain_type: { type: 'string', title: 'Chain Type', enum: ['stuff', 'map_reduce', 'refine'], default: 'stuff' },
+      },
+    },
+    codeTemplateId: 'llm/chain_rag',
+    requiredPackages: ['langchain', 'langchain-core'],
+  },
+  {
+    id: 'llm.chain.react_agent',
+    category: 'chain',
+    pipeline: 'llm',
+    label: 'ReAct Agent',
+    description: 'LangChain ReAct agent with tool use',
+    icon: '🤖',
+    color: '#ec4899',
+    inputs: [{ id: 'llm', label: 'LLM', type: 'Any' }],
+    outputs: [{ id: 'agent', label: 'Agent', type: 'Any' }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        tools: {
+          type: 'array',
+          title: 'Tools to enable',
+          items: { type: 'string', enum: ['web_search', 'python_repl', 'calculator', 'wikipedia'] },
+          default: ['calculator'],
+        },
+        max_iterations: { type: 'integer', title: 'Max Iterations', default: 10 },
+        system_prompt: { type: 'string', title: 'System Prompt' },
+      },
+    },
+    codeTemplateId: 'llm/chain_react_agent',
+    requiredPackages: ['langchain', 'langgraph'],
+  },
+  {
+    id: 'llm.chain.langgraph_workflow',
+    category: 'chain',
+    pipeline: 'llm',
+    label: 'LangGraph Workflow',
+    description: 'Stateful multi-step LLM workflow using LangGraph',
+    icon: '🕸️',
+    color: '#ec4899',
+    inputs: [{ id: 'llm', label: 'LLM', type: 'Any' }],
+    outputs: [{ id: 'graph', label: 'Graph', type: 'Any' }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        workflow_type: {
+          type: 'string',
+          title: 'Workflow Type',
+          enum: ['router', 'multi_agent', 'critic_refine'],
+          default: 'router',
+        },
+        checkpointer: { type: 'string', title: 'Checkpointer', enum: ['none', 'memory', 'sqlite'], default: 'memory' },
+      },
+    },
+    codeTemplateId: 'llm/chain_langgraph_workflow',
+    requiredPackages: ['langgraph', 'langchain-core'],
+  },
+  {
+    id: 'llm.chain.llamaindex_query',
+    category: 'chain',
+    pipeline: 'llm',
+    label: 'LlamaIndex Query',
+    description: 'LlamaIndex document query engine',
+    icon: '🦙',
+    color: '#ec4899',
+    inputs: [{ id: 'vectorstore', label: 'Vector Store', type: 'VectorStore' }],
+    outputs: [{ id: 'query_engine', label: 'Query Engine', type: 'Any' }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        llm_model: { type: 'string', title: 'LLM Model', default: 'gpt-4o-mini' },
+        api_key_env: { type: 'string', title: 'OpenAI API Key Env Var', default: 'OPENAI_API_KEY' },
+        similarity_top_k: { type: 'integer', title: 'Top K', default: 5 },
+        response_mode: { type: 'string', title: 'Response Mode', enum: ['compact', 'refine', 'tree_summarize'], default: 'compact' },
+      },
+    },
+    codeTemplateId: 'llm/chain_llamaindex_query',
+    requiredPackages: ['llama-index', 'llama-index-llms-openai'],
+  },
+]

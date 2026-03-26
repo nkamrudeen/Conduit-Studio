@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/projects/azure-arch-ide/**)",
+      "Bash(pnpm install:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm --filter @ai-ide/web install)",
+      "Bash(pnpm --filter @ai-ide/web exec vite build)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm add:*)",
+      "Bash(grep -v \"^$\")"
+    ]
+  }
+}

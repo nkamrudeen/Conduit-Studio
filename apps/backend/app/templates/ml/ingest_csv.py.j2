@@ -1,0 +1,10 @@
+# ── CSV Ingest ──────────────────────────────────────────────────────────────
+import pandas as pd
+
+df_{{ node_id }} = pd.read_csv(
+    "{{ config.file_path | default('data.csv') }}",
+    sep="{{ config.separator | default(',') }}",
+    encoding="{{ config.encoding | default('utf-8') }}",
+    header={{ config.header | default(0) }},
+)
+print(f"[CSV Ingest] Loaded {len(df_{{ node_id }})} rows × {df_{{ node_id }}.shape[1]} cols")

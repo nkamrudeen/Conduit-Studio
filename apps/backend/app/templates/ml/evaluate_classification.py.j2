@@ -1,0 +1,23 @@
+# ── Classification Evaluation ────────────────────────────────────────────────
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+{% if config.plot_confusion_matrix %}
+import matplotlib.pyplot as plt
+import seaborn as sns
+{% endif %}
+
+y_pred_{{ node_id }} = model_{{ node_id }}.predict(X_test_{{ node_id }})
+_acc_{{ node_id }} = accuracy_score(y_test_{{ node_id }}, y_pred_{{ node_id }})
+print(f"[Evaluation] Accuracy: {_acc_{{ node_id }}:.4f}")
+{% if config.output_report %}
+print(classification_report(y_test_{{ node_id }}, y_pred_{{ node_id }}))
+{% endif %}
+{% if config.plot_confusion_matrix %}
+_cm_{{ node_id }} = confusion_matrix(y_test_{{ node_id }}, y_pred_{{ node_id }})
+fig_{{ node_id }}, ax_{{ node_id }} = plt.subplots(figsize=(8, 6))
+sns.heatmap(_cm_{{ node_id }}, annot=True, fmt="d", cmap="Blues", ax=ax_{{ node_id }})
+ax_{{ node_id }}.set_title("Confusion Matrix")
+plt.tight_layout()
+plt.savefig("confusion_matrix.png", dpi=150)
+print("[Evaluation] Confusion matrix saved to confusion_matrix.png")
+{% endif %}
+metrics_{{ node_id }} = {"accuracy": _acc_{{ node_id }}}

@@ -1,0 +1,69 @@
+import type { NodeDefinition } from '@ai-ide/types'
+
+export const llmIngestNodes: NodeDefinition[] = [
+  {
+    id: 'llm.ingest.pdf',
+    category: 'ingest',
+    pipeline: 'llm',
+    label: 'PDF Loader',
+    description: 'Load and extract text from PDF files',
+    icon: '📑',
+    color: '#0ea5e9',
+    inputs: [],
+    outputs: [{ id: 'docs', label: 'Documents', type: 'Text' }],
+    configSchema: {
+      type: 'object',
+      required: ['file_path'],
+      properties: {
+        file_path: { type: 'string', title: 'PDF File Path or Directory' },
+        extract_images: { type: 'boolean', title: 'Extract Images', default: false },
+      },
+    },
+    codeTemplateId: 'llm/ingest_pdf',
+    requiredPackages: ['langchain', 'pypdf'],
+  },
+  {
+    id: 'llm.ingest.web',
+    category: 'ingest',
+    pipeline: 'llm',
+    label: 'Web Loader',
+    description: 'Load text from web URLs',
+    icon: '🌐',
+    color: '#0ea5e9',
+    inputs: [],
+    outputs: [{ id: 'docs', label: 'Documents', type: 'Text' }],
+    configSchema: {
+      type: 'object',
+      required: ['urls'],
+      properties: {
+        urls: { type: 'array', items: { type: 'string' }, title: 'URLs to load' },
+        recursive: { type: 'boolean', title: 'Recursive crawl', default: false },
+        max_depth: { type: 'integer', title: 'Max Depth (if recursive)', default: 2 },
+      },
+    },
+    codeTemplateId: 'llm/ingest_web',
+    requiredPackages: ['langchain', 'beautifulsoup4', 'requests'],
+  },
+  {
+    id: 'llm.ingest.s3_docs',
+    category: 'ingest',
+    pipeline: 'llm',
+    label: 'S3 Document Loader',
+    description: 'Load documents from AWS S3',
+    icon: '☁️',
+    color: '#f97316',
+    inputs: [],
+    outputs: [{ id: 'docs', label: 'Documents', type: 'Text' }],
+    configSchema: {
+      type: 'object',
+      required: ['bucket', 'prefix'],
+      properties: {
+        bucket: { type: 'string', title: 'S3 Bucket' },
+        prefix: { type: 'string', title: 'Key Prefix' },
+        file_types: { type: 'array', items: { type: 'string' }, title: 'File types', default: ['pdf', 'txt', 'md'] },
+      },
+    },
+    codeTemplateId: 'llm/ingest_s3_docs',
+    requiredPackages: ['langchain', 'boto3'],
+  },
+]

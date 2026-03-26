@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@ai-ide/types": ["../../packages/types/src/index.ts"],
+      "@ai-ide/ui": ["../../packages/ui/src/index.ts"],
+      "@ai-ide/canvas-engine": ["../../packages/canvas-engine/src/index.ts"],
+      "@ai-ide/node-registry": ["../../packages/node-registry/src/index.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "../../packages/types/src",
+    "../../packages/ui/src",
+    "../../packages/canvas-engine/src",
+    "../../packages/node-registry/src"
+  ]
+}

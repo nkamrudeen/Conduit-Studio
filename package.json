@@ -1,0 +1,26 @@
+{
+  "name": "ai-ide",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source drag-and-drop MLOps + LLMOps visual IDE",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=@ai-ide/web",
+    "dev:backend": "turbo dev --filter=@ai-ide/backend",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

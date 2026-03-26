@@ -1,0 +1,9 @@
+# ── OpenAI Embeddings ─────────────────────────────────────────────────────────
+import os
+from langchain_openai import OpenAIEmbeddings
+
+embeddings_{{ node_id }} = OpenAIEmbeddings(
+    model="{{ config.model | default('text-embedding-3-small') }}",
+    openai_api_key=os.environ["{{ config.api_key_env | default('OPENAI_API_KEY') }}"],
+)
+print(f"[Embeddings] Initialized OpenAI {{ config.model | default('text-embedding-3-small') }}")

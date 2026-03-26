@@ -1,0 +1,14 @@
+# ── Feature Scaler ───────────────────────────────────────────────────────────
+import pandas as pd
+from sklearn.preprocessing import {{ {'standard': 'StandardScaler', 'minmax': 'MinMaxScaler', 'robust': 'RobustScaler', 'maxabs': 'MaxAbsScaler'}[config.scaler_type | default('standard')] }}
+
+_scaler_{{ node_id }} = {{ {'standard': 'StandardScaler', 'minmax': 'MinMaxScaler', 'robust': 'RobustScaler', 'maxabs': 'MaxAbsScaler'}[config.scaler_type | default('standard')] }}()
+{% set cols = config.columns if config.columns else None %}
+{% if cols %}
+_cols_{{ node_id }} = {{ cols | tojson }}
+df_{{ node_id }}[_cols_{{ node_id }}] = _scaler_{{ node_id }}.fit_transform(df_{{ node_id }}[_cols_{{ node_id }}])
+{% else %}
+_num_cols_{{ node_id }} = df_{{ node_id }}.select_dtypes(include="number").columns.tolist()
+df_{{ node_id }}[_num_cols_{{ node_id }}] = _scaler_{{ node_id }}.fit_transform(df_{{ node_id }}[_num_cols_{{ node_id }}])
+{% endif %}
+print(f"[Scaler] Applied {{ config.scaler_type | default('standard') }} scaling")

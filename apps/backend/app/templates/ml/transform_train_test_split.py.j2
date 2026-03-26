@@ -1,0 +1,14 @@
+# ── Train / Test Split ───────────────────────────────────────────────────────
+import pandas as pd
+from sklearn.model_selection import train_test_split as _tts
+
+_X_{{ node_id }} = df_{{ node_id }}.drop(columns=["{{ config.target_column }}"])
+_y_{{ node_id }} = df_{{ node_id }}["{{ config.target_column }}"]
+
+X_train_{{ node_id }}, X_test_{{ node_id }}, y_train_{{ node_id }}, y_test_{{ node_id }} = _tts(
+    _X_{{ node_id }}, _y_{{ node_id }},
+    test_size={{ config.test_size | default(0.2) }},
+    random_state={{ config.random_state | default(42) }},
+    {% if config.stratify %}stratify=_y_{{ node_id }},{% endif %}
+)
+print(f"[Split] Train: {len(X_train_{{ node_id }})} rows | Test: {len(X_test_{{ node_id }})} rows")

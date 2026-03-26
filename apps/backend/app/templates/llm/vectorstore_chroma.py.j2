@@ -1,0 +1,10 @@
+# ── ChromaDB Vector Store ─────────────────────────────────────────────────────
+from langchain_chroma import Chroma
+
+vectorstore_{{ node_id }} = Chroma.from_documents(
+    documents=chunks_{{ node_id }},
+    embedding=embeddings_{{ node_id }},
+    collection_name="{{ config.collection_name | default('ai_ide_collection') }}",
+    persist_directory="{{ config.persist_directory | default('./chroma_db') }}",
+)
+print(f"[Chroma] Stored {len(chunks_{{ node_id }})} chunks in collection '{{ config.collection_name | default('ai_ide_collection') }}'")

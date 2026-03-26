@@ -1,0 +1,12 @@
+# ── PDF Document Loader ───────────────────────────────────────────────────────
+from langchain_community.document_loaders import PyPDFLoader, PyPDFDirectoryLoader
+import os
+
+_path_{{ node_id }} = "{{ config.file_path | default('documents/') }}"
+if os.path.isdir(_path_{{ node_id }}):
+    _loader_{{ node_id }} = PyPDFDirectoryLoader(_path_{{ node_id }})
+else:
+    _loader_{{ node_id }} = PyPDFLoader(_path_{{ node_id }})
+
+docs_{{ node_id }} = _loader_{{ node_id }}.load()
+print(f"[PDF Loader] Loaded {len(docs_{{ node_id }})} documents from {_path_{{ node_id }}}")

@@ -11,9 +11,7 @@
 </p>
 
 <p align="center">
-  <video src="docs/demo.mp4" width="960" autoplay loop muted playsinline controls alt="Conduit Studio — live demo">
-    <img src="docs/demo.gif" width="960" alt="Conduit Studio — live demo" />
-  </video>
+  <img src="docs/demo.gif" width="960" alt="Conduit Studio — live demo" />
 </p>
 
 ---

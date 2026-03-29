@@ -17,3 +17,12 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+
+# Electron build output (large binaries — not for source control)
+apps/desktop/release/
+
+# Playwright test artefacts
+apps/web/test-results/
+
+# Claude local settings
+.claude/settings.local.json

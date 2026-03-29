@@ -328,8 +328,14 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
     setUploading(true)
     setError(null)
     try {
+      // Read the entire file into memory before uploading.
+      // Chromium reads File handles lazily; if Windows touches the file metadata
+      // (antivirus, NTFS timestamps) between selection and upload it throws
+      // ERR_UPLOAD_FILE_CHANGED.  An in-memory Blob is immune to this.
+      const buffer = await file.arrayBuffer()
+      const blob = new Blob([buffer], { type: file.type || 'application/octet-stream' })
       const form = new FormData()
-      form.append('file', file)
+      form.append('file', blob, file.name)
       const res = await fetch(`${getApiBase()}/files/upload`, { method: 'POST', body: form })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json() as { server_path: string; filename: string }

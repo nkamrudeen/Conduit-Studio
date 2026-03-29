@@ -143,7 +143,7 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
                 line_bytes = await stream.readline()
                 if not line_bytes:
                     break
-                line = line_bytes.decode("utf-8", errors="replace").rstrip("\n")
+                line = line_bytes.decode("utf-8", errors="replace").rstrip("\r\n")
 
                 # Parse per-node status markers injected during code generation
                 if line.startswith("__AIIDE_NODE_START:"):
@@ -182,7 +182,14 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
 
     except Exception as exc:
         _run_status[run_id] = "error"
-        await queue.put({"type": "error", "text": f"Executor internal error: {exc}"})
+        exc_type = type(exc).__name__
+        exc_msg = str(exc) or repr(exc) or "(no message)"
+        tb = traceback.format_exc()
+        print(f"[executor] error ({exc_type}): {exc_msg}\n{tb}", file=sys.stderr, flush=True)
+        await queue.put({"type": "error", "text": f"Executor error ({exc_type}): {exc_msg}"})
+        for tb_line in tb.splitlines():
+            if tb_line.strip():
+                await queue.put({"type": "log", "text": tb_line, "stream": "stderr"})
         await queue.put({"type": "status", "status": "error", "node_id": None})
 
     finally:

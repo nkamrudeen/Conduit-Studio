@@ -4,6 +4,7 @@ import { Download, RefreshCw, Loader2 } from 'lucide-react'
 import { Button, Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import type { CodeGenFormat } from '@ai-ide/types'
+import { getApiBase } from '../../lib/api'
 
 const FORMATS: { id: CodeGenFormat; label: string }[] = [
   { id: 'python', label: 'Python Script' },
@@ -32,7 +33,7 @@ export function CodeGenPanel() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/codegen/generate', {
+      const res = await fetch(`${getApiBase()}/codegen/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dag, format: activeFormat }),

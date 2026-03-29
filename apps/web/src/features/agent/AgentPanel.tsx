@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { Bot, X, AlertTriangle, AlertCircle, Info, Lightbulb, Plus, RefreshCw, Sparkles } from 'lucide-react'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { nodeRegistry } from '@ai-ide/node-registry'
+import { getApiBase } from '../../lib/api'
 
 interface ValidationIssue {
   severity: 'error' | 'warning' | 'info'
@@ -73,7 +74,7 @@ export function AgentPanel({ onClose }: AgentPanelProps) {
     useAi ? setAiLoading(true) : setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/agent/analyze', {
+      const res = await fetch(`${getApiBase()}/agent/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dag, use_ai: useAi }),

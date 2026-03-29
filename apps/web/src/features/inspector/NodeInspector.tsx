@@ -3,6 +3,7 @@ import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
 import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X } from 'lucide-react'
+import { getApiBase } from '../../lib/api'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -53,7 +54,7 @@ export function NodeInspector() {
   const testConnection = async () => {
     setConnTest('loading')
     try {
-      const res = await fetch('/api/connectors/test', {
+      const res = await fetch(`${getApiBase()}/connectors/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connector_id: connectorId, config }),
@@ -69,7 +70,7 @@ export function NodeInspector() {
     setPreviewLoading(true)
     setPreview(null)
     try {
-      const res = await fetch('/api/connectors/preview?n_rows=20', {
+      const res = await fetch(`${getApiBase()}/connectors/preview?n_rows=20`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connector_id: connectorId, config }),
@@ -329,7 +330,7 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
     try {
       const form = new FormData()
       form.append('file', file)
-      const res = await fetch('/api/files/upload', { method: 'POST', body: form })
+      const res = await fetch(`${getApiBase()}/files/upload`, { method: 'POST', body: form })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json() as { server_path: string; filename: string }
       onChange(data.server_path)

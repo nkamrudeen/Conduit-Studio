@@ -12,6 +12,7 @@ import { LogPanel } from './LogPanel'
 import { AgentPanel } from '../agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
 import { Bot, CheckCircle2, XCircle, X } from 'lucide-react'
+import { getApiBase } from '../../lib/api'
 
 export function CanvasPage() {
   const { type = 'ml' } = useParams<{ type: string }>()
@@ -66,10 +67,10 @@ export function CanvasPage() {
     }
   }, [dag])
 
-  const handleRun = useCallback(() => startRun('/api/pipeline/run'), [startRun])
-  const handleRunDocker = useCallback(() => startRun('/api/pipeline/run-docker'), [startRun])
-  const handleRunInstall = useCallback(() => startRun('/api/pipeline/run-install'), [startRun])
-  const handleRunDockerInstall = useCallback(() => startRun('/api/pipeline/run-docker-install'), [startRun])
+  const handleRun = useCallback(() => startRun(`${getApiBase()}/pipeline/run`), [startRun])
+  const handleRunDocker = useCallback(() => startRun(`${getApiBase()}/pipeline/run-docker`), [startRun])
+  const handleRunInstall = useCallback(() => startRun(`${getApiBase()}/pipeline/run-install`), [startRun])
+  const handleRunDockerInstall = useCallback(() => startRun(`${getApiBase()}/pipeline/run-docker-install`), [startRun])
   const handleRunKubeflow = useCallback(() => setShowKubeflowDialog(true), [])
 
   const submitKubeflowRun = useCallback(async () => {
@@ -80,7 +81,7 @@ export function CanvasPage() {
     try {
       setIsRunning(true)
       setShowLogs(true)
-      const res = await fetch('/api/pipeline/run-kubeflow', {
+      const res = await fetch(`${getApiBase()}/pipeline/run-kubeflow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, experiment_name: kubeflowExperiment }),
@@ -118,7 +119,7 @@ export function CanvasPage() {
     if (!runId) return
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/pipeline/${runId}/status`)
+        const res = await fetch(`${getApiBase()}/pipeline/${runId}/status`)
         const { status } = await res.json()
         if (status === 'success' || status === 'error') {
           setIsRunning(false)

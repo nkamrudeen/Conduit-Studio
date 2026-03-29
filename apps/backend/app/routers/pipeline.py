@@ -45,6 +45,7 @@ async def run_pipeline(
         executor.execute_pipeline,
         run_id,
         request.dag.model_dump(),
+        request.env_vars,
     )
     return PipelineRunResponse(run_id=run_id, status="pending")
 
@@ -60,6 +61,7 @@ async def run_pipeline_with_install(
         executor.execute_pipeline_with_install,
         run_id,
         request.dag.model_dump(),
+        request.env_vars,
     )
     return PipelineRunResponse(run_id=run_id, status="pending")
 

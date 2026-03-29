@@ -62,6 +62,7 @@ async def _stream_subprocess(
     on_line: Callable[[str, str], Awaitable[None]],
     cwd: str | None = None,
     combine_stderr: bool = False,
+    extra_env: dict[str, str] | None = None,
 ) -> int:
     """Run *cmd* as a subprocess, calling ``on_line(line, stream_name)`` for
     each line of output.
@@ -84,8 +85,9 @@ async def _stream_subprocess(
             # Sentinel: tells the async drain loop this stream is finished.
             asyncio.run_coroutine_threadsafe(line_queue.put(None), loop)
 
+    run_env = {**os.environ, **(extra_env or {})}
     stderr_opt = subprocess.STDOUT if combine_stderr else subprocess.PIPE
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr_opt, cwd=cwd)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr_opt, cwd=cwd, env=run_env)
 
     # One sentinel per open stream.
     num_sentinels = 1 if combine_stderr else 2
@@ -238,7 +240,7 @@ def _prepare_dag_for_docker(dag: dict[str, Any], build_dir: str) -> dict[str, An
     return dag_copy
 
 
-async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
+async def execute_pipeline(run_id: str, dag: dict[str, Any], env_vars: dict[str, str] | None = None) -> None:
     """Run the pipeline described by *dag* and stream output to a queue.
 
     This coroutine is designed to be launched as an asyncio background task.
@@ -318,7 +320,7 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
             else:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
-        return_code = await _stream_subprocess([python_exe, tmp_path], _on_line)
+        return_code = await _stream_subprocess([python_exe, tmp_path], _on_line, extra_env=env_vars or {})
 
         # ── 4. Final status ───────────────────────────────────────────────
         if return_code == 0:
@@ -523,7 +525,7 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
 # Install-then-run executor (local)
 # ---------------------------------------------------------------------------
 
-async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any]) -> None:
+async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any], env_vars: dict[str, str] | None = None) -> None:
     """Like execute_pipeline but pip-installs required packages first."""
     queue: asyncio.Queue = asyncio.Queue()
     _run_queues[run_id] = queue
@@ -595,7 +597,7 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any]) -> Non
             else:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
-        return_code = await _stream_subprocess([python_exe, tmp_path], _on_line)
+        return_code = await _stream_subprocess([python_exe, tmp_path], _on_line, extra_env=env_vars or {})
         if return_code == 0:
             final_status = "success"
         else:

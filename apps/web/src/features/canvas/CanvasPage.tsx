@@ -13,7 +13,7 @@ import { AgentPanel } from '../agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
 import { Bot, CheckCircle2, XCircle, X } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
-import { getNodeIntegrationDefaults } from '../../lib/integrations'
+import { getNodeIntegrationDefaults, getIntegrationEnvVars } from '../../lib/integrations'
 
 export function CanvasPage() {
   const { type = 'ml' } = useParams<{ type: string }>()
@@ -50,7 +50,7 @@ export function CanvasPage() {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dag }),
+        body: JSON.stringify({ dag, env_vars: getIntegrationEnvVars() }),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -85,7 +85,7 @@ export function CanvasPage() {
       const res = await fetch(`${getApiBase()}/pipeline/run-kubeflow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, experiment_name: kubeflowExperiment }),
+        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, experiment_name: kubeflowExperiment, env_vars: getIntegrationEnvVars() }),
       })
       if (!res.ok) throw new Error(`Backend error ${res.status}: ${await res.text()}`)
       const { run_id } = await res.json()

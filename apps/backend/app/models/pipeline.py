@@ -37,6 +37,7 @@ class PipelineDAG(BaseModel):
 
 class PipelineRunRequest(BaseModel):
     dag: PipelineDAG
+    env_vars: dict[str, str] = Field(default_factory=dict, description="Extra env vars injected into the pipeline subprocess (e.g. API keys)")
 
 
 class PipelineRunResponse(BaseModel):

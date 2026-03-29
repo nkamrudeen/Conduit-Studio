@@ -562,15 +562,23 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
   // If the value already looks like an uploaded server path, show the filename.
   const displayName = uploadedName ?? (value ? value.split(/[\\/]/).pop() ?? value : null)
 
+  /** Read a File into an ArrayBuffer, trying arrayBuffer() first and falling
+   *  back to FileReader if the handle has been invalidated (Windows NotFoundError). */
+  const readFile = (file: File): Promise<ArrayBuffer> =>
+    file.arrayBuffer().catch(() =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as ArrayBuffer)
+        reader.onerror = () => reject(reader.error)
+        reader.readAsArrayBuffer(file)
+      })
+    )
+
   const handleUpload = async (file: File) => {
     setUploading(true)
     setError(null)
     try {
-      // Read the entire file into memory before uploading.
-      // Chromium reads File handles lazily; if Windows touches the file metadata
-      // (antivirus, NTFS timestamps) between selection and upload it throws
-      // ERR_UPLOAD_FILE_CHANGED.  An in-memory Blob is immune to this.
-      const buffer = await file.arrayBuffer()
+      const buffer = await readFile(file)
       const blob = new Blob([buffer], { type: file.type || 'application/octet-stream' })
       const form = new FormData()
       form.append('file', blob, file.name)

@@ -139,12 +139,8 @@ try {
   // ── 7. Code generation panel ──────────────────────────────────────────────
   console.log('\n🎬  Code generation panel')
   await page.getByRole('tab', { name: /code/i }).click().catch(() => {})
-  await wait(500)
-  const genBtn = page.locator('button').filter({ hasText: /generate/i }).first()
-  if (await genBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await genBtn.click()
-    await wait(1500)
-  }
+  await wait(600)
+  // Do NOT click Generate — backend isn't running; just capture the panel UI
   await shot(page, 'ml_code_panel')
 
   // Switch back to Canvas
@@ -197,19 +193,32 @@ try {
   await browser.close()
 }
 
-// ── assemble GIF + MP4 ────────────────────────────────────────────────────────
-const palette = path.join(SHOTS_DIR, 'palette.png')
-const gifOut  = path.join(OUT_DIR, 'demo.gif')
-const mp4Out  = path.join(OUT_DIR, 'demo.mp4')
+// ── build concat list (glob not supported on Windows ffmpeg) ──────────────────
+import { readdirSync as _rdir, writeFileSync } from 'fs'
+const palette  = path.join(SHOTS_DIR, 'palette.png')
+const concatTxt = path.join(SHOTS_DIR, 'concat.txt')
+const gifOut   = path.join(OUT_DIR, 'demo.gif')
+const mp4Out   = path.join(OUT_DIR, 'demo.mp4')
 
+const pngFiles = _rdir(SHOTS_DIR)
+  .filter(f => f.endsWith('.png') && f !== 'palette.png')
+  .sort()
+  .map(f => path.join(SHOTS_DIR, f).replace(/\\/g, '/'))
+
+writeFileSync(concatTxt,
+  pngFiles.map(f => `file '${f}'\nduration 2`).join('\n') + '\n'
+)
+console.log(`  ✓  concat list: ${pngFiles.length} frames`)
+
+// ── GIF ───────────────────────────────────────────────────────────────────────
 console.log('\n🎞   Building GIF…')
 execSync(
-  `"${FFMPEG}" -y -framerate 0.5 -pattern_type glob -i "${SHOTS_DIR}/*.png" ` +
+  `"${FFMPEG}" -y -f concat -safe 0 -i "${concatTxt}" ` +
   `-vf "fps=0.5,scale=1200:-2:flags=lanczos,palettegen=max_colors=192:stats_mode=diff" "${palette}"`,
   { stdio: 'inherit' }
 )
 execSync(
-  `"${FFMPEG}" -y -framerate 0.5 -pattern_type glob -i "${SHOTS_DIR}/*.png" ` +
+  `"${FFMPEG}" -y -f concat -safe 0 -i "${concatTxt}" ` +
   `-i "${palette}" ` +
   `-lavfi "fps=0.5,scale=1200:-2:flags=lanczos [x]; [x][1:v] paletteuse=dither=sierra2_4a" ` +
   `"${gifOut}"`,
@@ -217,9 +226,10 @@ execSync(
 )
 console.log(`  ✓  GIF → ${gifOut}`)
 
+// ── MP4 ───────────────────────────────────────────────────────────────────────
 console.log('\n🎞   Building MP4…')
 execSync(
-  `"${FFMPEG}" -y -framerate 0.4 -pattern_type glob -i "${SHOTS_DIR}/*.png" ` +
+  `"${FFMPEG}" -y -f concat -safe 0 -i "${concatTxt}" ` +
   `-vf "scale=1440:-2:flags=lanczos,format=yuv420p" ` +
   `-c:v libx264 -preset slow -crf 22 -movflags +faststart "${mp4Out}"`,
   { stdio: 'inherit' }

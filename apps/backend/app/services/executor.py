@@ -85,7 +85,9 @@ async def _stream_subprocess(
             # Sentinel: tells the async drain loop this stream is finished.
             asyncio.run_coroutine_threadsafe(line_queue.put(None), loop)
 
-    run_env = {**os.environ, **(extra_env or {})}
+    # Force UTF-8 I/O so emoji / non-ASCII chars from libraries (e.g. MLflow's
+    # 🏃 run URL line) don't crash with UnicodeEncodeError on Windows cp1252.
+    run_env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", **(extra_env or {})}
     stderr_opt = subprocess.STDOUT if combine_stderr else subprocess.PIPE
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr_opt, cwd=cwd, env=run_env)
 

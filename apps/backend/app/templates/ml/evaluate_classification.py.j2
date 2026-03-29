@@ -4,7 +4,11 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 import matplotlib
 matplotlib.use('Agg')  # non-interactive backend — prevents GUI hang in subprocess
 import matplotlib.pyplot as plt
-import seaborn as sns
+try:
+    import seaborn as sns
+    _has_seaborn_{{ node_id }} = True
+except ImportError:
+    _has_seaborn_{{ node_id }} = False
 {% endif %}
 
 {% set model_v = inputs['model'] if 'model' in inputs else input_var %}
@@ -21,7 +25,14 @@ print(classification_report(_y_test_{{ node_id }}, _y_pred_{{ node_id }}))
 {% if config.plot_confusion_matrix %}
 _cm_{{ node_id }} = confusion_matrix(_y_test_{{ node_id }}, _y_pred_{{ node_id }})
 fig_{{ node_id }}, ax_{{ node_id }} = plt.subplots(figsize=(8, 6))
-sns.heatmap(_cm_{{ node_id }}, annot=True, fmt="d", cmap="Blues", ax=ax_{{ node_id }})
+if _has_seaborn_{{ node_id }}:
+    sns.heatmap(_cm_{{ node_id }}, annot=True, fmt="d", cmap="Blues", ax=ax_{{ node_id }})
+else:
+    im = ax_{{ node_id }}.imshow(_cm_{{ node_id }}, interpolation="nearest", cmap="Blues")
+    fig_{{ node_id }}.colorbar(im, ax=ax_{{ node_id }})
+    for i in range(_cm_{{ node_id }}.shape[0]):
+        for j in range(_cm_{{ node_id }}.shape[1]):
+            ax_{{ node_id }}.text(j, i, str(_cm_{{ node_id }}[i, j]), ha="center", va="center", fontsize=10)
 ax_{{ node_id }}.set_title("Confusion Matrix")
 plt.tight_layout()
 plt.savefig("confusion_matrix.png", dpi=150)

@@ -1,0 +1,22 @@
+# ── LlamaIndex Query Engine ───────────────────────────────────────────────────
+import os
+from llama_index.core import VectorStoreIndex, Settings
+from llama_index.llms.openai import OpenAI as LlamaOpenAI
+from llama_index.core.node_parser import SimpleNodeParser
+
+{% set chunks_v = inputs['chunks'] if 'chunks' in inputs else input_var %}
+
+Settings.llm = LlamaOpenAI(
+    model="{{ config.llm_model | default('gpt-4o-mini') }}",
+    api_key=os.environ.get("{{ config.api_key_env | default('OPENAI_API_KEY') }}"),
+)
+
+# Convert LangChain documents to LlamaIndex nodes
+from llama_index.core import Document as LlamaDocument
+_llama_docs_{{ node_id }} = [LlamaDocument(text=d.page_content, metadata=d.metadata) for d in {{ chunks_v }}]
+_index_{{ node_id }} = VectorStoreIndex.from_documents(_llama_docs_{{ node_id }})
+query_engine_{{ node_id }} = _index_{{ node_id }}.as_query_engine(
+    similarity_top_k={{ config.similarity_top_k | default(5) }},
+    response_mode="{{ config.response_mode | default('compact') }}",
+)
+print(f"[LlamaIndex] Query engine ready — call query_engine_{{ node_id }}.query('your question')")

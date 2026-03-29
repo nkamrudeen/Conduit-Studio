@@ -1,0 +1,22 @@
+# ── HuggingFace Hub Push ──────────────────────────────────────────────────────
+import os
+import joblib
+from huggingface_hub import HfApi
+
+{% set model_v = inputs['model'] if 'model' in inputs else input_var %}
+
+_model_file_{{ node_id }} = "model.pkl"
+joblib.dump({{ model_v }}, _model_file_{{ node_id }})
+
+_hf_api_{{ node_id }} = HfApi(token=os.environ.get("{{ config.token_env | default('HF_TOKEN') }}"))
+_hf_api_{{ node_id }}.create_repo(
+    repo_id="{{ config.repo_id }}",
+    private={{ config.private | default(False) | tojson }},
+    exist_ok=True,
+)
+_hf_api_{{ node_id }}.upload_file(
+    path_or_fileobj=_model_file_{{ node_id }},
+    path_in_repo=_model_file_{{ node_id }},
+    repo_id="{{ config.repo_id }}",
+)
+print(f"[HuggingFace Hub] Model pushed to https://huggingface.co/{{ config.repo_id }}")

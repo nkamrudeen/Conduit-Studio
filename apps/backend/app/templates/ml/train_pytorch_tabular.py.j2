@@ -1,0 +1,72 @@
+# ── PyTorch Tabular MLP ───────────────────────────────────────────────────────
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split as _tts_pt
+
+_device_{{ node_id }} = torch.device("{{ config.device | default('cpu') }}")
+
+_df_{{ node_id }} = {{ input_var }}
+_X_all_{{ node_id }} = _df_{{ node_id }}.drop(columns=["{{ config.target_column }}"]).values.astype(np.float32)
+_y_all_raw_{{ node_id }} = _df_{{ node_id }}["{{ config.target_column }}"]
+
+_X_tr_{{ node_id }}, _X_va_{{ node_id }}, _y_tr_raw_{{ node_id }}, _y_va_raw_{{ node_id }} = _tts_pt(
+    _X_all_{{ node_id }}, _y_all_raw_{{ node_id }}, test_size=0.1, random_state=42
+)
+
+# Encode targets
+{% if config.task == 'classification' %}
+_le_{{ node_id }} = LabelEncoder()
+_y_tr_enc_{{ node_id }} = torch.tensor(_le_{{ node_id }}.fit_transform(_y_tr_raw_{{ node_id }}), dtype=torch.long)
+_y_va_enc_{{ node_id }} = torch.tensor(_le_{{ node_id }}.transform(_y_va_raw_{{ node_id }}), dtype=torch.long)
+_n_classes_{{ node_id }} = len(_le_{{ node_id }}.classes_)
+{% else %}
+_y_tr_enc_{{ node_id }} = torch.tensor(_y_tr_raw_{{ node_id }}.values, dtype=torch.float32).unsqueeze(1)
+_y_va_enc_{{ node_id }} = torch.tensor(_y_va_raw_{{ node_id }}.values, dtype=torch.float32).unsqueeze(1)
+{% endif %}
+
+_X_tr_t_{{ node_id }} = torch.tensor(_X_tr_{{ node_id }}, dtype=torch.float32)
+_X_va_t_{{ node_id }} = torch.tensor(_X_va_{{ node_id }}, dtype=torch.float32)
+
+_train_ds_{{ node_id }} = TensorDataset(_X_tr_t_{{ node_id }}, _y_tr_enc_{{ node_id }})
+_train_dl_{{ node_id }} = DataLoader(_train_ds_{{ node_id }}, batch_size={{ config.batch_size | default(32) }}, shuffle=True)
+
+# Build MLP
+_in_feats_{{ node_id }} = _X_tr_t_{{ node_id }}.shape[1]
+_layer_sizes_{{ node_id }} = [_in_feats_{{ node_id }}] + {{ config.hidden_layers | default([128, 64]) }}{% if config.task == 'classification' %} + [_n_classes_{{ node_id }}]{% else %} + [1]{% endif %}
+
+_layers_list_{{ node_id }} = []
+for _i in range(len(_layer_sizes_{{ node_id }}) - 1):
+    _layers_list_{{ node_id }}.append(nn.Linear(_layer_sizes_{{ node_id }}[_i], _layer_sizes_{{ node_id }}[_i + 1]))
+    if _i < len(_layer_sizes_{{ node_id }}) - 2:
+        _layers_list_{{ node_id }}.append(nn.ReLU())
+        _layers_list_{{ node_id }}.append(nn.Dropout(0.2))
+
+model_{{ node_id }} = nn.Sequential(*_layers_list_{{ node_id }}).to(_device_{{ node_id }})
+{% if config.task == 'classification' %}
+_criterion_{{ node_id }} = nn.CrossEntropyLoss()
+{% else %}
+_criterion_{{ node_id }} = nn.MSELoss()
+{% endif %}
+_optimizer_{{ node_id }} = optim.Adam(model_{{ node_id }}.parameters(), lr={{ config.learning_rate | default(0.001) }})
+
+for _epoch in range({{ config.epochs | default(50) }}):
+    model_{{ node_id }}.train()
+    _total_loss = 0.0
+    for _xb, _yb in _train_dl_{{ node_id }}:
+        _xb, _yb = _xb.to(_device_{{ node_id }}), _yb.to(_device_{{ node_id }})
+        _optimizer_{{ node_id }}.zero_grad()
+        _out = model_{{ node_id }}(_xb)
+        _loss = _criterion_{{ node_id }}(_out, _yb)
+        _loss.backward()
+        _optimizer_{{ node_id }}.step()
+        _total_loss += _loss.item()
+    if (_epoch + 1) % 10 == 0:
+        print(f"[PyTorch] Epoch {_epoch + 1}/{{ config.epochs | default(50) }} — loss: {_total_loss / len(_train_dl_{{ node_id }}):.4f}")
+
+model_{{ node_id }}.eval()
+print(f"[PyTorch] Training complete — {sum(p.numel() for p in model_{{ node_id }}.parameters()):,} parameters")

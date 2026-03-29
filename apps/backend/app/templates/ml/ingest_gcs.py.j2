@@ -1,0 +1,18 @@
+# ── Google Cloud Storage Ingest ───────────────────────────────────────────────
+import io
+import pandas as pd
+from google.cloud import storage as gcs_storage
+
+_gcs_client_{{ node_id }} = gcs_storage.Client(project="{{ config.project | default(None) }}" or None)
+_bucket_{{ node_id }} = _gcs_client_{{ node_id }}.bucket("{{ config.bucket }}")
+_blob_{{ node_id }} = _bucket_{{ node_id }}.blob("{{ config.blob }}")
+_data_{{ node_id }} = _blob_{{ node_id }}.download_as_bytes()
+
+{% if config.file_format == 'parquet' %}
+df_{{ node_id }} = pd.read_parquet(io.BytesIO(_data_{{ node_id }}))
+{% elif config.file_format == 'json' %}
+df_{{ node_id }} = pd.read_json(io.BytesIO(_data_{{ node_id }}))
+{% else %}
+df_{{ node_id }} = pd.read_csv(io.BytesIO(_data_{{ node_id }}))
+{% endif %}
+print(f"[GCS] Loaded {len(df_{{ node_id }})} rows from gs://{{ config.bucket }}/{{ config.blob }}")

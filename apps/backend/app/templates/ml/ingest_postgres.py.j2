@@ -1,0 +1,12 @@
+# ── PostgreSQL Ingest ─────────────────────────────────────────────────────────
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+
+_engine_{{ node_id }} = create_engine(os.environ["{{ config.connection_string_env | default('POSTGRES_URL') }}"])
+df_{{ node_id }} = pd.read_sql(
+    """{{ config.query | default('SELECT * FROM table_name') }}""",
+    con=_engine_{{ node_id }},
+)
+_engine_{{ node_id }}.dispose()
+print(f"[PostgreSQL] Loaded {len(df_{{ node_id }})} rows")

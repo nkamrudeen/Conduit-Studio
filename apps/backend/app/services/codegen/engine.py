@@ -3,21 +3,32 @@ Code generation engine.
 
 Takes a PipelineDAG, performs a topological sort, renders each node's
 Jinja2 template, then hands the ordered snippets to a format assembler.
+
+Variable passing: each node's output is tracked by (node_id, source_handle)
+so multi-output nodes (e.g. train/test split) correctly pass the right
+variable to each downstream target handle.
 """
 from __future__ import annotations
+import sys
 from collections import deque
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2 import Environment, FileSystemLoader, Undefined
 
 from app.models.pipeline import PipelineDAG, PipelineNode
 from app.models.codegen import CodeGenFormat, CodeGenResponse
 
-TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+# When running as a PyInstaller bundle, __file__ is inside the compressed archive
+# and the data files are extracted to sys._MEIPASS.  In normal mode the templates
+# sit two directories up from this file (app/services/codegen/ → app/templates/).
+if getattr(sys, 'frozen', False):
+    TEMPLATES_DIR = Path(sys._MEIPASS) / "app" / "templates"  # type: ignore[attr-defined]
+else:
+    TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
 
 _jinja_env = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
-    undefined=StrictUndefined,
+    undefined=Undefined,  # lenient: missing keys render as empty string / falsy
     trim_blocks=True,
     lstrip_blocks=True,
 )
@@ -61,6 +72,12 @@ _NODE_META: dict[str, dict] = {
     # ML Monitor
     "ml.monitor.evidently_drift": {"template": "ml/monitor_evidently_drift.py.j2", "packages": ["evidently"]},
     "ml.monitor.model_performance": {"template": "ml/monitor_model_performance.py.j2", "packages": ["scikit-learn", "evidently"]},
+    # ML MLflow Experiment Tracking
+    "ml.mlflow.set_experiment": {"template": "ml/mlflow_set_experiment.py.j2", "packages": ["mlflow"]},
+    "ml.mlflow.autolog": {"template": "ml/mlflow_autolog.py.j2", "packages": ["mlflow"]},
+    "ml.mlflow.log_params": {"template": "ml/mlflow_log_params.py.j2", "packages": ["mlflow"]},
+    "ml.mlflow.compare_runs": {"template": "ml/mlflow_compare_runs.py.j2", "packages": ["mlflow", "pandas"]},
+    "ml.mlflow.load_model": {"template": "ml/mlflow_load_model.py.j2", "packages": ["mlflow"]},
     # LLM
     "llm.ingest.pdf": {"template": "llm/ingest_pdf.py.j2", "packages": ["langchain", "pypdf"]},
     "llm.ingest.web": {"template": "llm/ingest_web.py.j2", "packages": ["langchain", "beautifulsoup4"]},
@@ -84,6 +101,102 @@ _NODE_META: dict[str, dict] = {
     "llm.deploy.langserve": {"template": "llm/deploy_langserve.py.j2", "packages": ["langserve", "fastapi", "uvicorn"]},
     "llm.deploy.fastapi": {"template": "llm/deploy_fastapi.py.j2", "packages": ["fastapi", "uvicorn"]},
     "llm.monitor.usage": {"template": "llm/monitor_usage.py.j2", "packages": ["langsmith"]},
+    # LLM Fine-tuning
+    "llm.finetune.dataset_prep": {"template": "llm/finetune_dataset_prep.py.j2", "packages": ["datasets", "transformers", "pandas"]},
+    "llm.finetune.lora_config": {"template": "llm/finetune_lora_config.py.j2", "packages": ["peft", "transformers"]},
+    "llm.finetune.qlora_config": {"template": "llm/finetune_qlora_config.py.j2", "packages": ["peft", "transformers", "bitsandbytes"]},
+    "llm.finetune.sft_trainer": {"template": "llm/finetune_sft_trainer.py.j2", "packages": ["trl", "peft", "transformers", "accelerate", "torch"]},
+    "llm.finetune.merge_push": {"template": "llm/finetune_merge_push.py.j2", "packages": ["peft", "transformers", "huggingface_hub"]},
+}
+
+# ── Per-handle output variable names for multi-output nodes ──────────────
+# Maps definitionId → {output_handle_id: var_name_template}
+# Use {short} as a placeholder for the 8-char node short ID.
+_NODE_HANDLE_OUTPUTS: dict[str, dict[str, str]] = {
+    "ml.transform.train_test_split": {
+        "df_train": "df_train_{short}",
+        "df_test": "df_test_{short}",
+    },
+}
+
+# ── Default output variable prefix for single-output nodes ─────────────
+_NODE_OUTPUT_PREFIX: dict[str, str] = {
+    # ML Ingest
+    "ml.ingest.csv": "df",
+    "ml.ingest.parquet": "df",
+    "ml.ingest.s3": "df",
+    "ml.ingest.azure": "df",
+    "ml.ingest.gcs": "df",
+    "ml.ingest.postgres": "df",
+    "ml.ingest.huggingface": "df",
+    # ML Transform
+    "ml.transform.column_select": "df",
+    "ml.transform.missing_values": "df",
+    "ml.transform.row_filter": "df",
+    "ml.transform.scaler": "df",
+    "ml.transform.encoder": "df",
+    "ml.transform.outlier_remove": "df",
+    # ML Train
+    "ml.train.sklearn.random_forest": "model",
+    "ml.train.sklearn.gradient_boosting": "model",
+    "ml.train.sklearn.logistic_regression": "model",
+    "ml.train.sklearn.svm": "model",
+    "ml.train.sklearn.xgboost": "model",
+    "ml.train.keras.sequential": "model",
+    "ml.train.pytorch.tabular": "model",
+    # ML Evaluate
+    "ml.evaluate.classification": "metrics",
+    "ml.evaluate.regression": "metrics",
+    "ml.evaluate.cross_validation": "metrics",
+    # ML Deploy
+    "ml.deploy.mlflow": "artifact",
+    "ml.deploy.fastapi": "artifact",
+    "ml.deploy.huggingface_hub": "artifact",
+    # ML Monitor
+    "ml.monitor.evidently_drift": "metrics",
+    "ml.monitor.model_performance": "metrics",
+    # ML MLflow
+    "ml.mlflow.set_experiment": "run",
+    "ml.mlflow.autolog": "run",
+    "ml.mlflow.log_params": "run",
+    "ml.mlflow.compare_runs": "df",
+    "ml.mlflow.load_model": "model",
+    # LLM Ingest
+    "llm.ingest.pdf": "docs",
+    "llm.ingest.web": "docs",
+    "llm.ingest.s3_docs": "docs",
+    # LLM Chunk
+    "llm.chunk.recursive": "chunks",
+    "llm.chunk.markdown": "chunks",
+    # LLM Embed
+    "llm.embed.openai": "embeddings",
+    "llm.embed.huggingface": "embeddings",
+    "llm.embed.ollama": "embeddings",
+    # LLM VectorStore
+    "llm.vectorstore.chroma": "vectorstore",
+    "llm.vectorstore.faiss": "vectorstore",
+    "llm.vectorstore.pinecone": "vectorstore",
+    # LLM Model
+    "llm.model.openai": "llm",
+    "llm.model.anthropic": "llm",
+    "llm.model.ollama": "llm",
+    "llm.model.vllm": "llm",
+    # LLM Chain
+    "llm.chain.rag": "chain",
+    "llm.chain.react_agent": "chain",
+    "llm.chain.langgraph_workflow": "chain",
+    "llm.chain.llamaindex_query": "chain",
+    # LLM Deploy
+    "llm.deploy.langserve": "artifact",
+    "llm.deploy.fastapi": "artifact",
+    # LLM Monitor
+    "llm.monitor.usage": "metrics",
+    # LLM Fine-tuning
+    "llm.finetune.dataset_prep": "dataset",
+    "llm.finetune.lora_config": "config",
+    "llm.finetune.qlora_config": "config",
+    "llm.finetune.sft_trainer": "model",
+    "llm.finetune.merge_push": "artifact",
 }
 
 
@@ -111,23 +224,81 @@ def topological_sort(dag: PipelineDAG) -> list[PipelineNode]:
     return [node_map[nid] for nid in sorted_ids]
 
 
-def render_node(node: PipelineNode, var_index: dict[str, str]) -> tuple[str, list[str]]:
-    """Render a single node's Jinja2 template. Returns (code_snippet, packages)."""
+def render_node(
+    node: PipelineNode,
+    inputs_by_handle: dict[str, str],
+) -> tuple[str, list[str]]:
+    """Render a single node's Jinja2 template.
+
+    Args:
+        node: The pipeline node to render.
+        inputs_by_handle: Maps each target handle ID to the variable name
+                          produced by the predecessor connected to that handle.
+
+    Returns:
+        (code_snippet, required_packages)
+    """
     meta = _NODE_META.get(node.definitionId)
     if meta is None:
         return f"# ⚠ Unknown node type: {node.definitionId}\n", []
+
+    # Primary input variable = first value in insertion order (handles are
+    # added in edge order, which respects the DAG topology).
+    input_var = next(iter(inputs_by_handle.values()), "") if inputs_by_handle else ""
 
     try:
         tmpl = _jinja_env.get_template(meta["template"])
         code = tmpl.render(
             node_id=node.id.replace("-", "_")[:8],
             config=node.config,
-            var=var_index,
+            input_var=input_var,
+            inputs=inputs_by_handle,
         )
     except Exception as exc:
         code = f"# ⚠ Template error for {node.definitionId}: {exc}\n"
 
     return code, meta["packages"]
+
+
+def generate_snippets(dag: PipelineDAG) -> tuple[list[PipelineNode], list[str], list[str]]:
+    """Return (ordered_nodes, snippets, packages) without assembling.
+
+    Used by the executor to inject per-node status markers at run time.
+    """
+    if not dag.nodes:
+        return [], [], []
+
+    ordered = topological_sort(dag)
+    snippets: list[str] = []
+    all_packages: list[str] = []
+    source_vars: dict[str, dict[str, str]] = {}
+    pred_edges: dict[str, list] = {}
+    for edge in dag.edges:
+        pred_edges.setdefault(edge.target, []).append(edge)
+
+    for node in ordered:
+        short = node.id.replace("-", "_")[:8]
+        inputs_by_handle: dict[str, str] = {}
+        for edge in pred_edges.get(node.id, []):
+            src_node_vars = source_vars.get(edge.source, {})
+            src_var = src_node_vars.get(edge.sourceHandle) or next(
+                iter(src_node_vars.values()), ""
+            )
+            if src_var:
+                inputs_by_handle[edge.targetHandle] = src_var
+        snippet, pkgs = render_node(node, inputs_by_handle)
+        snippets.append(snippet)
+        all_packages.extend(pkgs)
+        if node.definitionId in _NODE_HANDLE_OUTPUTS:
+            source_vars[node.id] = {
+                handle: tpl.format(short=short)
+                for handle, tpl in _NODE_HANDLE_OUTPUTS[node.definitionId].items()
+            }
+        else:
+            prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
+            source_vars[node.id] = {node.definitionId: f"{prefix}_{short}"}
+
+    return ordered, snippets, list(dict.fromkeys(all_packages))
 
 
 def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
@@ -143,17 +314,48 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
     ordered = topological_sort(dag)
     snippets: list[str] = []
     all_packages: list[str] = []
-    var_index: dict[str, str] = {}  # node_id → output variable name
+
+    # source_vars[node_id][handle_id] = variable_name produced by that output handle
+    source_vars: dict[str, dict[str, str]] = {}
+
+    # Build edge index: target_node_id → list of incoming edges
+    pred_edges: dict[str, list] = {}
+    for edge in dag.edges:
+        pred_edges.setdefault(edge.target, []).append(edge)
 
     for node in ordered:
-        snippet, pkgs = render_node(node, var_index)
+        short = node.id.replace("-", "_")[:8]
+
+        # Build inputs_by_handle: target_handle → source variable name
+        inputs_by_handle: dict[str, str] = {}
+        for edge in pred_edges.get(node.id, []):
+            src_node_vars = source_vars.get(edge.source, {})
+            # Prefer the specific source handle; fall back to the first output var
+            src_var = src_node_vars.get(edge.sourceHandle) or next(
+                iter(src_node_vars.values()), ""
+            )
+            if src_var:
+                inputs_by_handle[edge.targetHandle] = src_var
+
+        snippet, pkgs = render_node(node, inputs_by_handle)
         snippets.append(snippet)
         all_packages.extend(pkgs)
-        # Update var_index: the node's output variable is df_{short_id}
-        short = node.id.replace("-", "_")[:8]
-        var_index[node.id] = f"df_{short}"
+
+        # Record output variables for this node
+        if node.definitionId in _NODE_HANDLE_OUTPUTS:
+            # Multi-output node: register each handle's variable
+            source_vars[node.id] = {
+                handle: tpl.format(short=short)
+                for handle, tpl in _NODE_HANDLE_OUTPUTS[node.definitionId].items()
+            }
+        else:
+            prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
+            source_vars[node.id] = {node.definitionId: f"{prefix}_{short}"}
+
         if node.definitionId not in _NODE_META:
-            warnings.append(f"Node '{node.definitionId}' has no template — placeholder generated.")
+            warnings.append(
+                f"Node '{node.definitionId}' has no template — placeholder generated."
+            )
 
     unique_packages = list(dict.fromkeys(all_packages))
 

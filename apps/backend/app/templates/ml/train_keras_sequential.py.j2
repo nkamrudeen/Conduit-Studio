@@ -1,0 +1,64 @@
+# ── Keras Sequential Neural Network ──────────────────────────────────────────
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split as _tts_keras
+import pandas as pd
+
+_df_{{ node_id }} = {{ input_var }}
+_X_all_{{ node_id }} = _df_{{ node_id }}.drop(columns=["{{ config.target_column }}"]).values.astype(np.float32)
+_y_all_raw_{{ node_id }} = _df_{{ node_id }}["{{ config.target_column }}"]
+
+_X_tr_{{ node_id }}, _X_va_{{ node_id }}, _y_tr_raw_{{ node_id }}, _y_va_raw_{{ node_id }} = _tts_keras(
+    _X_all_{{ node_id }}, _y_all_raw_{{ node_id }}, test_size=0.1, random_state=42
+)
+
+# Prepare targets
+{% if config.task == 'classification' %}
+_le_{{ node_id }} = LabelEncoder()
+_y_tr_enc_{{ node_id }} = _le_{{ node_id }}.fit_transform(_y_tr_raw_{{ node_id }})
+_y_va_enc_{{ node_id }} = _le_{{ node_id }}.transform(_y_va_raw_{{ node_id }})
+_n_classes_{{ node_id }} = len(_le_{{ node_id }}.classes_)
+_y_tr_cat_{{ node_id }} = keras.utils.to_categorical(_y_tr_enc_{{ node_id }}, _n_classes_{{ node_id }})
+_y_va_cat_{{ node_id }} = keras.utils.to_categorical(_y_va_enc_{{ node_id }}, _n_classes_{{ node_id }})
+{% endif %}
+
+# Build model
+_layers_{{ node_id }} = [keras.layers.Input(shape=(_X_tr_{{ node_id }}.shape[1],))]
+{% for units in config.hidden_layers | default([128, 64]) %}
+_layers_{{ node_id }}.append(keras.layers.Dense({{ units }}, activation="{{ config.activation | default('relu') }}"))
+_layers_{{ node_id }}.append(keras.layers.Dropout({{ config.dropout_rate | default(0.2) }}))
+{% endfor %}
+{% if config.task == 'classification' %}
+_layers_{{ node_id }}.append(keras.layers.Dense(_n_classes_{{ node_id }}, activation="softmax"))
+model_{{ node_id }} = keras.Sequential(_layers_{{ node_id }})
+model_{{ node_id }}.compile(
+    optimizer=keras.optimizers.Adam(learning_rate={{ config.learning_rate | default(0.001) }}),
+    loss="categorical_crossentropy",
+    metrics=["accuracy"],
+)
+model_{{ node_id }}.fit(
+    _X_tr_{{ node_id }}, _y_tr_cat_{{ node_id }},
+    validation_data=(_X_va_{{ node_id }}, _y_va_cat_{{ node_id }}),
+    epochs={{ config.epochs | default(50) }},
+    batch_size={{ config.batch_size | default(32) }},
+    verbose=1,
+)
+{% else %}
+_layers_{{ node_id }}.append(keras.layers.Dense(1))
+model_{{ node_id }} = keras.Sequential(_layers_{{ node_id }})
+model_{{ node_id }}.compile(
+    optimizer=keras.optimizers.Adam(learning_rate={{ config.learning_rate | default(0.001) }}),
+    loss="mse",
+    metrics=["mae"],
+)
+model_{{ node_id }}.fit(
+    _X_tr_{{ node_id }}, _y_tr_raw_{{ node_id }}.values,
+    validation_data=(_X_va_{{ node_id }}, _y_va_raw_{{ node_id }}.values),
+    epochs={{ config.epochs | default(50) }},
+    batch_size={{ config.batch_size | default(32) }},
+    verbose=1,
+)
+{% endif %}
+print(f"[Keras] Training complete — {model_{{ node_id }}.count_params():,} parameters")

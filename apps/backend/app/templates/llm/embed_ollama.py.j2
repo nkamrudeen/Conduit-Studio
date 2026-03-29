@@ -1,0 +1,8 @@
+# ── Ollama Embeddings ─────────────────────────────────────────────────────────
+from langchain_ollama import OllamaEmbeddings
+
+embeddings_{{ node_id }} = OllamaEmbeddings(
+    model="{{ config.model | default('nomic-embed-text') }}",
+    base_url="{{ config.base_url | default('http://localhost:11434') }}",
+)
+print(f"[Embeddings] Initialized Ollama embeddings: {{ config.model | default('nomic-embed-text') }}")

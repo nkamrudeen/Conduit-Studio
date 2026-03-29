@@ -1,0 +1,32 @@
+# ── LLM Usage Monitor ─────────────────────────────────────────────────────────
+import time
+from langchain_community.callbacks import get_openai_callback
+
+{% set chain_v = inputs['chain'] if 'chain' in inputs else input_var %}
+
+{% if config.log_to_langsmith %}
+import os
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = os.environ.get("{{ config.langsmith_api_key_env | default('LANGCHAIN_API_KEY') }}", "")
+print("[Monitor] LangSmith tracing enabled")
+{% endif %}
+
+# Wrap chain call with token/cost tracking
+_test_query_{{ node_id }} = "What is the main topic of the documents?"
+print(f"[Monitor] Running test query to measure usage...")
+
+with get_openai_callback() as _cb_{{ node_id }}:
+    _result_{{ node_id }} = {{ chain_v }}.invoke({"query": _test_query_{{ node_id }}})
+
+metrics_{{ node_id }} = {
+    "total_tokens": _cb_{{ node_id }}.total_tokens,
+    "prompt_tokens": _cb_{{ node_id }}.prompt_tokens,
+    "completion_tokens": _cb_{{ node_id }}.completion_tokens,
+    "total_cost_usd": _cb_{{ node_id }}.total_cost,
+}
+print(f"[Monitor] Tokens: {metrics_{{ node_id }}['total_tokens']} | Cost: ${metrics_{{ node_id }}['total_cost_usd']:.6f}")
+
+{% if config.alert_cost_threshold_usd %}
+if metrics_{{ node_id }}["total_cost_usd"] * 86400 > {{ config.alert_cost_threshold_usd }}:
+    print(f"⚠ ALERT: Projected daily cost ${metrics_{{ node_id }}['total_cost_usd'] * 86400:.2f} exceeds threshold ${{ config.alert_cost_threshold_usd }}")
+{% endif %}

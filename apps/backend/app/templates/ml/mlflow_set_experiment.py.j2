@@ -1,0 +1,11 @@
+# ── MLflow: Set Experiment ────────────────────────────────────────────────────
+import mlflow
+
+mlflow.set_tracking_uri("{{ config.tracking_uri | default('http://localhost:5000') }}")
+experiment_name_{{ node_id }} = "{{ config.experiment_name | default('my_experiment') }}"
+mlflow.set_experiment(experiment_name_{{ node_id }})
+run_{{ node_id }} = mlflow.start_run(
+    run_name="{{ config.run_name | default('') }}",
+    tags={{ config.tags | default({}) | tojson }},
+)
+print(f"[MLflow] Experiment: {experiment_name_{{ node_id }}} | Run ID: {run_{{ node_id }}.info.run_id}")

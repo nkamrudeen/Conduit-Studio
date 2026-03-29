@@ -9,10 +9,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./styles.css": "./dist/styles.css"
+    "./globals.css": "./src/globals.css"
   },
   "scripts": {
-    "build": "tsc && node scripts/build-css.mjs",
+    "build": "tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

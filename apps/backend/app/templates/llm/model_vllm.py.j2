@@ -1,0 +1,12 @@
+# ── vLLM Server (OpenAI-compatible) ──────────────────────────────────────────
+from langchain_openai import ChatOpenAI
+
+# vLLM exposes an OpenAI-compatible API — no key needed for local server
+llm_{{ node_id }} = ChatOpenAI(
+    model="{{ config.model_name }}",
+    base_url="{{ config.base_url | default('http://localhost:8000/v1') }}",
+    api_key="EMPTY",  # vLLM does not require a real key
+    temperature={{ config.temperature | default(0.7) }},
+    max_tokens={{ config.max_tokens | default(1000) }},
+)
+print(f"[LLM] Initialized vLLM {{ config.model_name }} @ {{ config.base_url | default('http://localhost:8000/v1') }}")

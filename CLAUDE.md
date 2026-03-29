@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**AI-IDE** is an open-source drag-and-drop visual IDE for MLOps and LLMOps. Users build pipelines as flowcharts; the IDE generates executable code from the visual flow. It is designed to be pluggable (VS Code-style plugin system) and targets both browser and Electron desktop deployment.
+**Conduit Studio** is an open-source drag-and-drop visual IDE for MLOps and LLMOps. Users build pipelines as flowcharts; the IDE generates executable code from the visual flow. It is designed to be pluggable (VS Code-style plugin system) and targets both browser and Electron desktop deployment.
 
 ## Planned Stack
 
@@ -75,7 +75,7 @@ Plugins follow a manifest-first, iframe-sandbox model:
 - Each plugin ships a `plugin.manifest.json` declaring name, version, category, and `nodeTypes[]`
 - Plugins render UI inside sandboxed iframes; communicate with the host via `postMessage`
 - Core postMessage message types: `REGISTER_NODE`, `NODE_EXECUTE`, `GET_CONFIG`, `SEND_DATA`
-- Plugins are discovered from `~/.aiide/plugins/` at startup
+- Plugins are discovered from `~/.conduit/plugins/` at startup
 
 ## Node Type Contract
 

@@ -1,0 +1,35 @@
+# ── ReAct Agent ───────────────────────────────────────────────────────────────
+from langchain.agents import AgentExecutor, create_react_agent
+from langchain import hub
+from langchain.tools import Tool
+
+{% set llm_v = inputs['llm'] if 'llm' in inputs else input_var %}
+
+_tools_{{ node_id }} = []
+{% set tools = config.tools | default(['calculator']) %}
+{% if 'calculator' in tools %}
+# Simple calculator via Python eval (sandboxed use only)
+def _calculate(expr: str) -> str:
+    try:
+        return str(eval(expr, {"__builtins__": {}}, {}))
+    except Exception as e:
+        return f"Error: {e}"
+_tools_{{ node_id }}.append(Tool(name="calculator", func=_calculate, description="Evaluates a math expression"))
+{% endif %}
+{% if 'wikipedia' in tools %}
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+_wiki_{{ node_id }} = WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper())
+_tools_{{ node_id }}.append(_wiki_{{ node_id }})
+{% endif %}
+
+_prompt_{{ node_id }} = hub.pull("hwchase17/react")
+_agent_{{ node_id }} = create_react_agent({{ llm_v }}, _tools_{{ node_id }}, _prompt_{{ node_id }})
+chain_{{ node_id }} = AgentExecutor(
+    agent=_agent_{{ node_id }},
+    tools=_tools_{{ node_id }},
+    max_iterations={{ config.max_iterations | default(10) }},
+    verbose=True,
+    handle_parsing_errors=True,
+)
+print(f"[ReAct Agent] Ready with {len(_tools_{{ node_id }})} tools — call chain_{{ node_id }}.invoke({{'input': 'your query'}})")

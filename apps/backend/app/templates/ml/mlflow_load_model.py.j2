@@ -1,0 +1,7 @@
+# ── MLflow: Load Registered Model ────────────────────────────────────────────
+import mlflow
+
+mlflow.set_tracking_uri("{{ config.tracking_uri | default('http://localhost:5000') }}")
+model_uri_{{ node_id }} = "models:/{{ config.model_name | default('my_model') }}/{{ config.model_version | default('Production') }}"
+model_{{ node_id }} = mlflow.pyfunc.load_model(model_uri_{{ node_id }})
+print(f"[MLflow] Loaded model: {model_uri_{{ node_id }}}")

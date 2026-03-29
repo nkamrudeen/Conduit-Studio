@@ -1,0 +1,24 @@
+# ── MLflow: Autolog ───────────────────────────────────────────────────────────
+import mlflow
+
+{% set framework = config.framework | default('sklearn') %}
+{% if framework == 'sklearn' %}
+import mlflow.sklearn
+mlflow.sklearn.autolog(
+    log_input_examples={{ config.log_input_examples | default(False) | tojson }},
+    log_model_signatures={{ config.log_model_signatures | default(True) | tojson }},
+    log_models={{ config.log_models | default(True) | tojson }},
+)
+{% elif framework == 'xgboost' %}
+import mlflow.xgboost
+mlflow.xgboost.autolog()
+{% elif framework == 'keras' %}
+import mlflow.keras
+mlflow.keras.autolog(log_models={{ config.log_models | default(True) | tojson }})
+{% elif framework == 'pytorch' %}
+import mlflow.pytorch
+mlflow.pytorch.autolog(log_models={{ config.log_models | default(True) | tojson }})
+{% else %}
+mlflow.autolog()
+{% endif %}
+print(f"[MLflow] Autolog enabled for framework: {{ framework }}")

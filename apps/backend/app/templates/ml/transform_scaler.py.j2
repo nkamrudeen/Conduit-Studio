@@ -2,6 +2,7 @@
 import pandas as pd
 from sklearn.preprocessing import {{ {'standard': 'StandardScaler', 'minmax': 'MinMaxScaler', 'robust': 'RobustScaler', 'maxabs': 'MaxAbsScaler'}[config.scaler_type | default('standard')] }}
 
+df_{{ node_id }} = {{ input_var }}.copy()
 _scaler_{{ node_id }} = {{ {'standard': 'StandardScaler', 'minmax': 'MinMaxScaler', 'robust': 'RobustScaler', 'maxabs': 'MaxAbsScaler'}[config.scaler_type | default('standard')] }}()
 {% set cols = config.columns if config.columns else None %}
 {% if cols %}

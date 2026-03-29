@@ -1,0 +1,51 @@
+# ── LangGraph Workflow ────────────────────────────────────────────────────────
+from typing import TypedDict, Annotated
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import HumanMessage, AIMessage
+import operator
+
+{% set llm_v = inputs['llm'] if 'llm' in inputs else input_var %}
+
+class _State_{{ node_id }}(TypedDict):
+    messages: Annotated[list, operator.add]
+    question: str
+    answer: str
+
+def _call_llm_{{ node_id }}(state: _State_{{ node_id }}) -> dict:
+    response = {{ llm_v }}.invoke(state["messages"])
+    return {"messages": [response], "answer": response.content}
+
+{% if config.workflow_type == 'critic_refine' %}
+def _critic_{{ node_id }}(state: _State_{{ node_id }}) -> dict:
+    _critic_prompt = f"Review this answer and suggest improvements:\n{state['answer']}"
+    _critique = {{ llm_v }}.invoke([HumanMessage(content=_critic_prompt)])
+    return {"messages": [_critique]}
+
+def _refine_{{ node_id }}(state: _State_{{ node_id }}) -> dict:
+    _refine_prompt = f"Given this critique, provide an improved answer:\n{state['messages'][-1].content}"
+    _refined = {{ llm_v }}.invoke([HumanMessage(content=_refine_prompt)])
+    return {"messages": [_refined], "answer": _refined.content}
+
+_builder_{{ node_id }} = StateGraph(_State_{{ node_id }})
+_builder_{{ node_id }}.add_node("generate", _call_llm_{{ node_id }})
+_builder_{{ node_id }}.add_node("critic", _critic_{{ node_id }})
+_builder_{{ node_id }}.add_node("refine", _refine_{{ node_id }})
+_builder_{{ node_id }}.set_entry_point("generate")
+_builder_{{ node_id }}.add_edge("generate", "critic")
+_builder_{{ node_id }}.add_edge("critic", "refine")
+_builder_{{ node_id }}.add_edge("refine", END)
+{% else %}
+_builder_{{ node_id }} = StateGraph(_State_{{ node_id }})
+_builder_{{ node_id }}.add_node("llm", _call_llm_{{ node_id }})
+_builder_{{ node_id }}.set_entry_point("llm")
+_builder_{{ node_id }}.add_edge("llm", END)
+{% endif %}
+
+{% if config.checkpointer == 'memory' %}
+_checkpointer_{{ node_id }} = MemorySaver()
+graph_{{ node_id }} = _builder_{{ node_id }}.compile(checkpointer=_checkpointer_{{ node_id }})
+{% else %}
+graph_{{ node_id }} = _builder_{{ node_id }}.compile()
+{% endif %}
+print(f"[LangGraph] Workflow compiled — invoke with graph_{{ node_id }}.invoke({{'messages': [HumanMessage(content='...')], 'question': '...', 'answer': ''}})")

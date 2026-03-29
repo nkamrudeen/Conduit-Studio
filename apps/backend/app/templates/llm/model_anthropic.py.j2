@@ -1,0 +1,15 @@
+# ── Anthropic Claude LLM ──────────────────────────────────────────────────────
+import os
+from langchain_anthropic import ChatAnthropic
+
+llm_{{ node_id }} = ChatAnthropic(
+    model="{{ config.model | default('claude-sonnet-4-6') }}",
+    temperature={{ config.temperature | default(0.7) }},
+    max_tokens={{ config.max_tokens | default(1000) }},
+    anthropic_api_key=os.environ["{{ config.api_key_env | default('ANTHROPIC_API_KEY') }}"],
+)
+{% if config.system_prompt %}
+from langchain_core.messages import SystemMessage
+_system_{{ node_id }} = SystemMessage(content="{{ config.system_prompt }}")
+{% endif %}
+print(f"[LLM] Initialized Anthropic {{ config.model | default('claude-sonnet-4-6') }}")

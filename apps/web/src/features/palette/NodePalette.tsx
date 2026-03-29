@@ -8,7 +8,8 @@ const CATEGORY_ORDER: NodeCategory[] = [
   'ingest', 'extract', 'transform', 'filter', 'split',
   'chunk', 'embed', 'vectorstore',
   'train', 'llm', 'chain',
-  'evaluate', 'deploy', 'monitor',
+  'evaluate', 'deploy', 'monitor', 'experiment',
+  'finetune',
 ]
 
 const CATEGORY_LABELS: Record<NodeCategory, string> = {
@@ -26,6 +27,8 @@ const CATEGORY_LABELS: Record<NodeCategory, string> = {
   evaluate: 'Evaluation',
   deploy: 'Deploy',
   monitor: 'Monitoring',
+  experiment: 'MLflow Experiments',
+  finetune: 'Fine-Tuning (LoRA/QLoRA)',
 }
 
 interface NodePaletteProps {
@@ -53,7 +56,7 @@ export function NodePalette({ pipeline }: NodePaletteProps) {
   }, [nodes])
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-card">
+    <aside data-testid="node-palette" className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-card">
       <div className="p-2">
         <div className="relative">
           <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />

@@ -1,0 +1,23 @@
+# ── SVM Training ─────────────────────────────────────────────────────────────
+import pandas as pd
+{% if config.task == 'regression' %}
+from sklearn.svm import SVR
+{% else %}
+from sklearn.svm import SVC
+{% endif %}
+
+_df_{{ node_id }} = {{ input_var }}
+_X_{{ node_id }} = _df_{{ node_id }}.drop(columns=["{{ config.target_column }}"])
+_y_{{ node_id }} = _df_{{ node_id }}["{{ config.target_column }}"]
+
+{% if config.task == 'regression' %}
+model_{{ node_id }} = SVR(
+{% else %}
+model_{{ node_id }} = SVC(
+{% endif %}
+    kernel="{{ config.kernel | default('rbf') }}",
+    C={{ config.C | default(1.0) }},
+    probability=True,
+)
+model_{{ node_id }}.fit(_X_{{ node_id }}, _y_{{ node_id }})
+print(f"[SVM] Training complete — kernel={{ config.kernel | default('rbf') }}, C={{ config.C | default(1.0) }}")

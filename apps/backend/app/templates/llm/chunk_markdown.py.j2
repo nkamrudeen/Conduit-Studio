@@ -1,0 +1,12 @@
+# ── Markdown Header Splitter ──────────────────────────────────────────────────
+from langchain.text_splitter import MarkdownHeaderTextSplitter
+
+_headers_{{ node_id }} = [(h, h.replace("#", "H").strip()) for h in {{ config.headers_to_split_on | default(['#', '##', '###']) | tojson }}]
+_splitter_{{ node_id }} = MarkdownHeaderTextSplitter(
+    headers_to_split_on=_headers_{{ node_id }},
+    strip_headers={{ config.strip_headers | default(False) | tojson }},
+)
+chunks_{{ node_id }} = []
+for _doc in {{ input_var }}:
+    chunks_{{ node_id }}.extend(_splitter_{{ node_id }}.split_text(_doc.page_content))
+print(f"[Markdown Splitter] Split into {len(chunks_{{ node_id }})} chunks")

@@ -1,0 +1,27 @@
+# ── S3 Document Loader ────────────────────────────────────────────────────────
+import boto3
+import tempfile, os
+from pathlib import Path
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
+
+_s3_{{ node_id }} = boto3.client("s3")
+_paginator_{{ node_id }} = _s3_{{ node_id }}.get_paginator("list_objects_v2")
+_file_types_{{ node_id }} = {{ config.file_types | default(['pdf', 'txt', 'md']) | tojson }}
+docs_{{ node_id }} = []
+
+for _page in _paginator_{{ node_id }}.paginate(Bucket="{{ config.bucket }}", Prefix="{{ config.prefix }}"):
+    for _obj in _page.get("Contents", []):
+        _key = _obj["Key"]
+        _ext = Path(_key).suffix.lstrip(".")
+        if _ext not in _file_types_{{ node_id }}:
+            continue
+        with tempfile.NamedTemporaryFile(suffix=f".{_ext}", delete=False) as _tmp:
+            _s3_{{ node_id }}.download_fileobj("{{ config.bucket }}", _key, _tmp)
+            _tmp_path = _tmp.name
+        try:
+            _loader = PyPDFLoader(_tmp_path) if _ext == "pdf" else TextLoader(_tmp_path)
+            docs_{{ node_id }}.extend(_loader.load())
+        finally:
+            os.unlink(_tmp_path)
+
+print(f"[S3 Docs] Loaded {len(docs_{{ node_id }})} documents from s3://{{ config.bucket }}/{{ config.prefix }}")

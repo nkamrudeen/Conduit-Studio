@@ -1,0 +1,159 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: ⚙ AI-IDE
+      - generic [ref=e7]: MLOps & LLMOps Visual IDE
+    - navigation [ref=e8]:
+      - link "ML Pipeline" [ref=e9] [cursor=pointer]:
+        - /url: /pipeline/ml
+        - img [ref=e10]
+        - text: ML Pipeline
+      - link "LLM Pipeline" [ref=e12] [cursor=pointer]:
+        - /url: /pipeline/llm
+        - img [ref=e13]
+        - text: LLM Pipeline
+    - generic [ref=e23]:
+      - button "Plugins" [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+      - button "Integrations" [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+      - button "Settings" [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+  - generic [ref=e37]:
+    - complementary [ref=e38]:
+      - generic [ref=e40]:
+        - img [ref=e41]
+        - textbox "Search nodes…" [ref=e44]
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - paragraph [ref=e50]: Data Ingestion
+          - generic [ref=e51]:
+            - generic "Load and extract text from PDF files" [ref=e52]:
+              - generic [ref=e53]: 📑
+              - generic [ref=e54]: PDF Loader
+            - generic "Load text from web URLs" [ref=e55]:
+              - generic [ref=e56]: 🌐
+              - generic [ref=e57]: Web Loader
+            - generic "Load documents from AWS S3" [ref=e58]:
+              - generic [ref=e59]: ☁️
+              - generic [ref=e60]: S3 Document Loader
+        - generic [ref=e61]:
+          - paragraph [ref=e62]: Chunking
+          - generic [ref=e63]:
+            - generic "Split documents into chunks recursively" [ref=e64]:
+              - generic [ref=e65]: ✂️
+              - generic [ref=e66]: Recursive Text Splitter
+            - generic "Split markdown documents by headers" [ref=e67]:
+              - generic [ref=e68]: 📝
+              - generic [ref=e69]: Markdown Splitter
+        - generic [ref=e70]:
+          - paragraph [ref=e71]: Embedding
+          - generic [ref=e72]:
+            - generic "Embed text using OpenAI text-embedding-3 models" [ref=e73]:
+              - generic [ref=e74]: 🔢
+              - generic [ref=e75]: OpenAI Embeddings
+            - generic "Embed text using a local HuggingFace sentence-transformer model" [ref=e76]:
+              - generic [ref=e77]: 🤗
+              - generic [ref=e78]: HuggingFace Embeddings
+            - generic "Embed text using a local Ollama model" [ref=e79]:
+              - generic [ref=e80]: 🦙
+              - generic [ref=e81]: Ollama Embeddings
+        - generic [ref=e82]:
+          - paragraph [ref=e83]: Vector Store
+          - generic [ref=e84]:
+            - generic "Store and retrieve embeddings in ChromaDB" [ref=e85]:
+              - generic [ref=e86]: 🎨
+              - generic [ref=e87]: Chroma
+            - generic "In-memory / local FAISS vector store" [ref=e88]:
+              - generic [ref=e89]: 🔍
+              - generic [ref=e90]: FAISS
+            - generic "Managed vector store via Pinecone" [ref=e91]:
+              - generic [ref=e92]: 🌲
+              - generic [ref=e93]: Pinecone
+        - generic [ref=e94]:
+          - paragraph [ref=e95]: LLM Model
+          - generic [ref=e96]:
+            - generic "OpenAI GPT-4o / GPT-4 / GPT-3.5 models" [ref=e97]:
+              - generic [ref=e98]: 🤖
+              - generic [ref=e99]: OpenAI
+            - generic "Anthropic Claude 3.5 / 3 / Haiku models" [ref=e100]:
+              - generic [ref=e101]: 🔮
+              - generic [ref=e102]: Anthropic Claude
+            - generic "Run open LLMs locally via Ollama (Llama, Mistral, Gemma…)" [ref=e103]:
+              - generic [ref=e104]: 🦙
+              - generic [ref=e105]: Ollama (Local)
+            - generic "High-throughput local inference via vLLM server" [ref=e106]:
+              - generic [ref=e107]: ⚡
+              - generic [ref=e108]: vLLM
+        - generic [ref=e109]:
+          - paragraph [ref=e110]: Chain / Agent
+          - generic [ref=e111]:
+            - generic "Retrieval-Augmented Generation — retrieve + answer" [ref=e112]:
+              - generic [ref=e113]: 🔗
+              - generic [ref=e114]: RAG Chain
+            - generic "LangChain ReAct agent with tool use" [ref=e115]:
+              - generic [ref=e116]: 🤖
+              - generic [ref=e117]: ReAct Agent
+            - generic "Stateful multi-step LLM workflow using LangGraph" [ref=e118]:
+              - generic [ref=e119]: 🕸️
+              - generic [ref=e120]: LangGraph Workflow
+            - generic "LlamaIndex document query engine" [ref=e121]:
+              - generic [ref=e122]: 🦙
+              - generic [ref=e123]: LlamaIndex Query
+        - generic [ref=e124]:
+          - paragraph [ref=e125]: Deploy
+          - generic [ref=e126]:
+            - generic "Deploy chain as a REST API via LangServe" [ref=e127]:
+              - generic [ref=e128]: 🚀
+              - generic [ref=e129]: LangServe
+            - generic "Wrap chain in a custom FastAPI endpoint" [ref=e130]:
+              - generic [ref=e131]: 🌐
+              - generic [ref=e132]: FastAPI Endpoint
+        - generic [ref=e133]:
+          - paragraph [ref=e134]: Monitoring
+          - generic "Track token usage, latency, and cost" [ref=e136]:
+            - generic [ref=e137]: 📊
+            - generic [ref=e138]: LLM Usage Monitor
+    - generic [ref=e139]:
+      - generic [ref=e140]:
+        - textbox [ref=e141]: Untitled Pipeline
+        - generic [ref=e142]: 0 nodes · 0 edges
+        - generic [ref=e143]:
+          - button "Sample" [ref=e144] [cursor=pointer]:
+            - img [ref=e145]
+            - text: Sample
+          - button "Save" [ref=e147] [cursor=pointer]:
+            - img [ref=e148]
+            - text: Save
+          - button "Load" [ref=e151] [cursor=pointer]:
+            - img [ref=e152]
+            - text: Load
+          - button "Reset" [ref=e154] [cursor=pointer]:
+            - img [ref=e155]
+            - text: Reset
+          - button "Run" [disabled]:
+            - img
+            - text: Run
+      - generic [ref=e158]:
+        - tablist [ref=e160]:
+          - tab "Canvas" [selected] [ref=e161] [cursor=pointer]
+          - tab "Code" [ref=e162] [cursor=pointer]
+        - tabpanel "Canvas" [ref=e163]:
+          - application [ref=e165]:
+            - img
+            - generic "Control Panel" [ref=e168]:
+              - button "Zoom In" [ref=e169] [cursor=pointer]:
+                - img [ref=e170]
+              - button "Zoom Out" [ref=e172] [cursor=pointer]:
+                - img [ref=e173]
+              - button "Fit View" [ref=e175] [cursor=pointer]:
+                - img [ref=e176]
+              - button "Toggle Interactivity" [ref=e178] [cursor=pointer]:
+                - img [ref=e179]
+            - img "Mini Map" [ref=e182]
+    - complementary [ref=e184]:
+      - paragraph [ref=e185]: Select a node to configure it
+```

@@ -1,0 +1,35 @@
+# ── Fine-tuning: QLoRA Configuration (4-bit quantization) ─────────────────────
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig, TaskType
+
+base_model_{{ node_id }} = "{{ config.base_model | default('meta-llama/Llama-3.1-8B-Instruct') }}"
+
+_bnb_{{ node_id }} = BitsAndBytesConfig(
+    load_in_4bit={{ config.load_in_4bit | default(True) | tojson }},
+    bnb_4bit_quant_type="{{ config.bnb_4bit_quant_type | default('nf4') }}",
+    bnb_4bit_compute_dtype=getattr(torch, "{{ config.bnb_4bit_compute_dtype | default('bfloat16') }}"),
+    bnb_4bit_use_double_quant={{ config.use_nested_quant | default(True) | tojson }},
+)
+
+tokenizer_{{ node_id }} = AutoTokenizer.from_pretrained(base_model_{{ node_id }}, use_fast=True)
+if tokenizer_{{ node_id }}.pad_token is None:
+    tokenizer_{{ node_id }}.pad_token = tokenizer_{{ node_id }}.eos_token
+
+model_base_{{ node_id }} = AutoModelForCausalLM.from_pretrained(
+    base_model_{{ node_id }},
+    quantization_config=_bnb_{{ node_id }},
+    device_map="auto",
+)
+model_base_{{ node_id }}.config.use_cache = False
+model_base_{{ node_id }}.config.pretraining_tp = 1
+
+config_{{ node_id }} = LoraConfig(
+    r={{ config.r | default(64) }},
+    lora_alpha={{ config.lora_alpha | default(16) }},
+    lora_dropout={{ config.lora_dropout | default(0.1) }},
+    target_modules={{ config.target_modules | default(['q_proj', 'v_proj', 'k_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj']) | tojson }},
+    bias="none",
+    task_type=TaskType.CAUSAL_LM,
+)
+print(f"[QLoRAConfig] Base: {base_model_{{ node_id }}} | 4-bit NF4 | rank={config_{{ node_id }}.r}")

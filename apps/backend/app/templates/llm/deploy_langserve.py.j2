@@ -1,0 +1,30 @@
+# ── LangServe Deployment ──────────────────────────────────────────────────────
+# LangServe runs as a separate server process.
+# This generates a ready-to-run server script.
+
+_LANGSERVE_CODE_{{ node_id }} = '''
+from fastapi import FastAPI
+from langserve import add_routes
+import uvicorn
+
+# Paste your chain definition here (generated above)
+# chain = ...
+
+app = FastAPI(title="AI-IDE LangServe API", version="1.0")
+add_routes(app, chain, path="{{ config.route | default('/chain') }}")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="{{ config.host | default('0.0.0.0') }}", port={{ config.port | default(8080) }})
+'''
+
+with open("langserve_app.py", "w") as _f:
+    _f.write(_LANGSERVE_CODE_{{ node_id }})
+
+print("[LangServe] Server script written to langserve_app.py")
+print("  Run: python langserve_app.py")
+print("  Docs: http://{{ config.host | default('localhost') }}:{{ config.port | default(8080) }}/docs")
+print("  Playground: http://{{ config.host | default('localhost') }}:{{ config.port | default(8080) }}{{ config.route | default('/chain') }}/playground")

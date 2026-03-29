@@ -1,0 +1,19 @@
+# ── Azure Blob Storage Ingest ─────────────────────────────────────────────────
+import os
+import io
+import pandas as pd
+from azure.storage.blob import BlobServiceClient
+
+_conn_str_{{ node_id }} = os.environ["{{ config.connection_string_env | default('AZURE_STORAGE_CONNECTION_STRING') }}"]
+_blob_client_{{ node_id }} = BlobServiceClient.from_connection_string(_conn_str_{{ node_id }})
+_container_client_{{ node_id }} = _blob_client_{{ node_id }}.get_container_client("{{ config.container }}")
+_blob_data_{{ node_id }} = _container_client_{{ node_id }}.download_blob("{{ config.blob_name }}").readall()
+
+{% if config.file_format == 'parquet' %}
+df_{{ node_id }} = pd.read_parquet(io.BytesIO(_blob_data_{{ node_id }}))
+{% elif config.file_format == 'json' %}
+df_{{ node_id }} = pd.read_json(io.BytesIO(_blob_data_{{ node_id }}))
+{% else %}
+df_{{ node_id }} = pd.read_csv(io.BytesIO(_blob_data_{{ node_id }}))
+{% endif %}
+print(f"[Azure Blob] Loaded {len(df_{{ node_id }})} rows from {{ config.container }}/{{ config.blob_name }}")

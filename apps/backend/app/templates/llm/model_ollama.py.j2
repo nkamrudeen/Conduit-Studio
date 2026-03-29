@@ -1,0 +1,13 @@
+# ── Ollama Local LLM ──────────────────────────────────────────────────────────
+from langchain_ollama import ChatOllama
+
+llm_{{ node_id }} = ChatOllama(
+    model="{{ config.model | default('llama3.2') }}",
+    base_url="{{ config.base_url | default('http://localhost:11434') }}",
+    temperature={{ config.temperature | default(0.7) }},
+)
+{% if config.system_prompt %}
+from langchain_core.messages import SystemMessage
+_system_{{ node_id }} = SystemMessage(content="{{ config.system_prompt }}")
+{% endif %}
+print(f"[LLM] Initialized Ollama {{ config.model | default('llama3.2') }} @ {{ config.base_url | default('http://localhost:11434') }}")

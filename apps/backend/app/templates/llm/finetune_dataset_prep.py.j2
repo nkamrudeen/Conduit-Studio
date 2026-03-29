@@ -1,0 +1,47 @@
+# ── Fine-tuning: Dataset Preparation ─────────────────────────────────────────
+from datasets import load_dataset, Dataset
+import pandas as pd
+
+{% set source = config.source_type | default('huggingface') %}
+{% set fmt = config.format | default('alpaca') %}
+{% set max_s = config.max_samples | default(0) %}
+
+# Load raw data
+{% if source == 'huggingface' %}
+_raw_{{ node_id }} = load_dataset("{{ config.dataset_name | default('tatsu-lab/alpaca') }}", split="train")
+{% elif source == 'csv' %}
+_raw_{{ node_id }} = Dataset.from_pandas(pd.read_csv("{{ config.file_path }}"))
+{% elif source == 'jsonl' %}
+_raw_{{ node_id }} = load_dataset("json", data_files="{{ config.file_path }}", split="train")
+{% endif %}
+
+{% if max_s and max_s > 0 %}
+_raw_{{ node_id }} = _raw_{{ node_id }}.select(range(min({{ max_s }}, len(_raw_{{ node_id }}))))
+{% endif %}
+
+# Format into prompt strings
+def _format_{{ node_id }}(example):
+{% if fmt == 'alpaca' %}
+    instruction = example.get("{{ config.instruction_col | default('instruction') }}", "")
+    inp = example.get("{{ config.input_col | default('input') }}", "")
+    out = example.get("{{ config.output_col | default('output') }}", "")
+    prompt = f"### Instruction:\n{instruction}\n"
+    if inp: prompt += f"\n### Input:\n{inp}\n"
+    prompt += f"\n### Response:\n{out}"
+{% elif fmt == 'chatml' %}
+    instruction = example.get("{{ config.instruction_col | default('instruction') }}", "")
+    out = example.get("{{ config.output_col | default('output') }}", "")
+    prompt = f"<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n{out}<|im_end|>"
+{% elif fmt == 'llama3' %}
+    instruction = example.get("{{ config.instruction_col | default('instruction') }}", "")
+    out = example.get("{{ config.output_col | default('output') }}", "")
+    prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n{instruction}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n{out}<|eot_id|>"
+{% else %}
+    prompt = str(example)
+{% endif %}
+    return {"text": prompt}
+
+dataset_{{ node_id }} = _raw_{{ node_id }}.map(_format_{{ node_id }}, remove_columns=_raw_{{ node_id }}.column_names)
+train_size = int(len(dataset_{{ node_id }}) * {{ config.train_split | default(0.95) }})
+dataset_{{ node_id }} = dataset_{{ node_id }}.train_test_split(test_size=len(dataset_{{ node_id }}) - train_size)
+print(f"[DatasetPrep] Train: {len(dataset_{{ node_id }}['train'])} | Eval: {len(dataset_{{ node_id }}['test'])}")

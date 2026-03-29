@@ -5,5 +5,5 @@ _splitter_{{ node_id }} = RecursiveCharacterTextSplitter(
     chunk_size={{ config.chunk_size | default(1000) }},
     chunk_overlap={{ config.chunk_overlap | default(200) }},
 )
-chunks_{{ node_id }} = _splitter_{{ node_id }}.split_documents(docs_{{ node_id }})
+chunks_{{ node_id }} = _splitter_{{ node_id }}.split_documents({{ input_var }})
 print(f"[Chunker] Split into {len(chunks_{{ node_id }})} chunks")

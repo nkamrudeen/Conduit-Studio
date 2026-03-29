@@ -1,10 +1,15 @@
 # ── ChromaDB Vector Store ─────────────────────────────────────────────────────
 from langchain_chroma import Chroma
 
+{% set chunks_v = inputs['chunks'] if 'chunks' in inputs else input_var %}
+{% set embed_v = inputs['embeddings'] if 'embeddings' in inputs else None %}
+
 vectorstore_{{ node_id }} = Chroma.from_documents(
-    documents=chunks_{{ node_id }},
-    embedding=embeddings_{{ node_id }},
+    documents={{ chunks_v }},
+    {% if embed_v %}
+    embedding={{ embed_v }},
+    {% endif %}
     collection_name="{{ config.collection_name | default('ai_ide_collection') }}",
     persist_directory="{{ config.persist_directory | default('./chroma_db') }}",
 )
-print(f"[Chroma] Stored {len(chunks_{{ node_id }})} chunks in collection '{{ config.collection_name | default('ai_ide_collection') }}'")
+print(f"[Chroma] Stored {len({{ chunks_v }})} chunks in collection '{{ config.collection_name | default('ai_ide_collection') }}'")

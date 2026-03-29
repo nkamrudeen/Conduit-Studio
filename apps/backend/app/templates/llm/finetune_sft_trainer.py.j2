@@ -1,0 +1,48 @@
+# ── Fine-tuning: SFT Trainer ──────────────────────────────────────────────────
+from transformers import TrainingArguments
+from trl import SFTTrainer, SFTConfig
+
+{% set dataset_v = inputs['dataset'] if 'dataset' in inputs else input_var %}
+{% set config_v = inputs['config'] if 'config' in inputs else None %}
+
+_train_args_{{ node_id }} = SFTConfig(
+    output_dir="{{ config.output_dir | default('./fine_tuned_model') }}",
+    num_train_epochs={{ config.num_train_epochs | default(3) }},
+    per_device_train_batch_size={{ config.per_device_train_batch_size | default(4) }},
+    gradient_accumulation_steps={{ config.gradient_accumulation_steps | default(4) }},
+    learning_rate={{ config.learning_rate | default(2e-4) }},
+    lr_scheduler_type="{{ config.lr_scheduler_type | default('cosine') }}",
+    warmup_ratio={{ config.warmup_ratio | default(0.03) }},
+    max_seq_length={{ config.max_seq_length | default(2048) }},
+    logging_steps={{ config.logging_steps | default(10) }},
+    save_steps={{ config.save_steps | default(100) }},
+    fp16={{ config.fp16 | default(False) | tojson }},
+    bf16={{ config.bf16 | default(True) | tojson }},
+    packing={{ config.packing | default(False) | tojson }},
+    dataset_text_field="text",
+    report_to="none",
+)
+
+{% if config_v %}
+_trainer_{{ node_id }} = SFTTrainer(
+    model=model_base_{{ config_v.split('_')[1] if '_' in config_v else 'base' }},
+    args=_train_args_{{ node_id }},
+    train_dataset={{ dataset_v }}["train"],
+    eval_dataset={{ dataset_v }}["test"],
+    peft_config=config_{{ config_v.split('_')[1] if '_' in config_v else 'lora' }},
+    tokenizer=tokenizer_{{ config_v.split('_')[1] if '_' in config_v else 'base' }},
+)
+{% else %}
+_trainer_{{ node_id }} = SFTTrainer(
+    model=model_base_{{ node_id }},
+    args=_train_args_{{ node_id }},
+    train_dataset={{ dataset_v }}["train"],
+    eval_dataset={{ dataset_v }}["test"],
+)
+{% endif %}
+
+print("[SFTTrainer] Starting training...")
+_trainer_{{ node_id }}.train()
+model_{{ node_id }} = _trainer_{{ node_id }}.model
+print(f"[SFTTrainer] Training complete. Saving to {{ config.output_dir | default('./fine_tuned_model') }}")
+_trainer_{{ node_id }}.save_model("{{ config.output_dir | default('./fine_tuned_model') }}")

@@ -1,0 +1,282 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: ⚙ AI-IDE
+      - generic [ref=e7]: MLOps & LLMOps Visual IDE
+    - navigation [ref=e8]:
+      - link "ML Pipeline" [ref=e9] [cursor=pointer]:
+        - /url: /pipeline/ml
+        - img [ref=e10]
+        - text: ML Pipeline
+      - link "LLM Pipeline" [ref=e12] [cursor=pointer]:
+        - /url: /pipeline/llm
+        - img [ref=e13]
+        - text: LLM Pipeline
+    - generic [ref=e23]:
+      - button "Plugins" [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+      - button "Integrations" [ref=e27] [cursor=pointer]:
+        - img [ref=e28]
+      - button "Settings" [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+  - generic [ref=e37]:
+    - complementary [ref=e38]:
+      - generic [ref=e40]:
+        - img [ref=e41]
+        - textbox "Search nodes…" [ref=e44]
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - paragraph [ref=e50]: Data Ingestion
+          - generic [ref=e51]:
+            - generic "Load a CSV file into a DataFrame" [ref=e52]:
+              - generic [ref=e53]: 📄
+              - generic [ref=e54]: CSV File
+            - generic "Load a Parquet file into a DataFrame" [ref=e55]:
+              - generic [ref=e56]: 🗜️
+              - generic [ref=e57]: Parquet File
+            - generic "Load a file from AWS S3 into a DataFrame" [ref=e58]:
+              - generic [ref=e59]: ☁️
+              - generic [ref=e60]: AWS S3
+            - generic "Load a file from Azure Blob Storage" [ref=e61]:
+              - generic [ref=e62]: 🔷
+              - generic [ref=e63]: Azure Blob
+            - generic "Load a file from GCS into a DataFrame" [ref=e64]:
+              - generic [ref=e65]: 🌐
+              - generic [ref=e66]: Google Cloud Storage
+            - generic "Load data from a PostgreSQL table or query" [ref=e67]:
+              - generic [ref=e68]: 🐘
+              - generic [ref=e69]: PostgreSQL
+            - generic "Load a dataset from the HuggingFace Hub" [ref=e70]:
+              - generic [ref=e71]: 🤗
+              - generic [ref=e72]: HuggingFace Dataset
+        - generic [ref=e73]:
+          - paragraph [ref=e74]: Extraction
+          - generic "Select or drop specific columns" [ref=e76]:
+            - generic [ref=e77]: 🔎
+            - generic [ref=e78]: Column Selector
+        - generic [ref=e79]:
+          - paragraph [ref=e80]: Transform
+          - generic [ref=e81]:
+            - generic "Scale numeric features (MinMax, Standard, Robust)" [ref=e82]:
+              - generic [ref=e83]: 📐
+              - generic [ref=e84]: Feature Scaler
+            - generic "Encode categorical columns (Label or One-Hot)" [ref=e85]:
+              - generic [ref=e86]: 🏷️
+              - generic [ref=e87]: Category Encoder
+        - generic [ref=e88]:
+          - paragraph [ref=e89]: Filter
+          - generic [ref=e90]:
+            - generic "Handle missing / null values" [ref=e91]:
+              - generic [ref=e92]: 🕳️
+              - generic [ref=e93]: Missing Values
+            - generic "Filter rows using a pandas query expression" [ref=e94]:
+              - generic [ref=e95]: 🔍
+              - generic [ref=e96]: Row Filter
+            - generic "Remove outliers using IQR or Z-score method" [ref=e97]:
+              - generic [ref=e98]: 📊
+              - generic [ref=e99]: Outlier Remover
+        - generic [ref=e100]:
+          - paragraph [ref=e101]: Split
+          - generic "Split DataFrame into train and test sets" [ref=e103]:
+            - generic [ref=e104]: ✂️
+            - generic [ref=e105]: Train / Test Split
+        - generic [ref=e106]:
+          - paragraph [ref=e107]: Training
+          - generic [ref=e108]:
+            - generic "scikit-learn RandomForestClassifier / Regressor" [ref=e109]:
+              - generic [ref=e110]: 🌲
+              - generic [ref=e111]: Random Forest
+            - generic "scikit-learn GradientBoostingClassifier / Regressor" [ref=e112]:
+              - generic [ref=e113]: 🚀
+              - generic [ref=e114]: Gradient Boosting
+            - generic "scikit-learn LogisticRegression" [ref=e115]:
+              - generic [ref=e116]: 📈
+              - generic [ref=e117]: Logistic Regression
+            - generic "scikit-learn Support Vector Machine" [ref=e118]:
+              - generic [ref=e119]: ⚡
+              - generic [ref=e120]: SVM
+            - generic "XGBoost classifier / regressor" [ref=e121]:
+              - generic [ref=e122]: 🎯
+              - generic [ref=e123]: XGBoost
+            - generic "TensorFlow/Keras Sequential neural network" [ref=e124]:
+              - generic [ref=e125]: 🧠
+              - generic [ref=e126]: Keras Sequential
+            - generic "PyTorch MLP for tabular data" [ref=e127]:
+              - generic [ref=e128]: 🔥
+              - generic [ref=e129]: PyTorch Tabular
+        - generic [ref=e130]:
+          - paragraph [ref=e131]: Evaluation
+          - generic [ref=e132]:
+            - generic "Accuracy, precision, recall, F1, confusion matrix" [ref=e133]:
+              - generic [ref=e134]: 📋
+              - generic [ref=e135]: Classification Report
+            - generic "MAE, MSE, RMSE, R² score" [ref=e136]:
+              - generic [ref=e137]: 📉
+              - generic [ref=e138]: Regression Metrics
+            - generic "k-Fold cross-validation scoring" [ref=e139]:
+              - generic [ref=e140]: 🔄
+              - generic [ref=e141]: Cross Validation
+        - generic [ref=e142]:
+          - paragraph [ref=e143]: Deploy
+          - generic [ref=e144]:
+            - generic "Log and register the model to MLflow" [ref=e145]:
+              - generic [ref=e146]: 📦
+              - generic [ref=e147]: MLflow Registry
+            - generic "Generate a FastAPI serving endpoint for the model" [ref=e148]:
+              - generic [ref=e149]: 🌐
+              - generic [ref=e150]: FastAPI Endpoint
+            - generic "Push the model to the HuggingFace Hub" [ref=e151]:
+              - generic [ref=e152]: 🤗
+              - generic [ref=e153]: HuggingFace Hub Push
+        - generic [ref=e154]:
+          - paragraph [ref=e155]: Monitoring
+          - generic [ref=e156]:
+            - generic "Detect data drift between reference and current datasets" [ref=e157]:
+              - generic [ref=e158]: 📡
+              - generic [ref=e159]: Data Drift (Evidently)
+            - generic "Track model performance metrics over time" [ref=e160]:
+              - generic [ref=e161]: 📈
+              - generic [ref=e162]: Model Performance Monitor
+    - generic [ref=e163]:
+      - generic [ref=e164]:
+        - textbox [ref=e165]: Iris Classification Pipeline
+        - generic [ref=e166]: 7 nodes · 9 edges
+        - generic [ref=e167]:
+          - button "Sample" [active] [ref=e168] [cursor=pointer]:
+            - img [ref=e169]
+            - text: Sample
+          - button "Save" [ref=e171] [cursor=pointer]:
+            - img [ref=e172]
+            - text: Save
+          - button "Load" [ref=e175] [cursor=pointer]:
+            - img [ref=e176]
+            - text: Load
+          - button "Reset" [ref=e178] [cursor=pointer]:
+            - img [ref=e179]
+            - text: Reset
+          - button "Run" [ref=e182] [cursor=pointer]:
+            - img [ref=e183]
+            - text: Run
+      - generic [ref=e185]:
+        - tablist [ref=e187]:
+          - tab "Canvas" [selected] [ref=e188] [cursor=pointer]
+          - tab "Code" [ref=e189] [cursor=pointer]
+        - tabpanel "Canvas" [ref=e190]:
+          - application [ref=e192]:
+            - generic [ref=e194]:
+              - generic:
+                - generic:
+                  - img:
+                    - group "Edge from node-ingest-csv to node-missing-values"
+                  - img:
+                    - group "Edge from node-split to node-train-rf" [ref=e195] [cursor=pointer]
+                  - img:
+                    - group "Edge from node-split to node-evaluate"
+                  - img:
+                    - group "Edge from node-train-rf to node-evaluate" [ref=e198] [cursor=pointer]
+                  - img:
+                    - group "Edge from node-train-rf to node-mlflow" [ref=e201] [cursor=pointer]
+                  - img:
+                    - group "Edge from node-evaluate to node-mlflow" [ref=e204] [cursor=pointer]
+                  - img:
+                    - group "Edge from node-split to node-drift-monitor"
+                  - img:
+                    - group "Edge from node-split to node-drift-monitor"
+                - generic:
+                  - group [ref=e207]:
+                    - generic [ref=e208]:
+                      - generic [ref=e209]:
+                        - generic [ref=e210]: 📄
+                        - generic [ref=e211]: CSV File
+                      - paragraph [ref=e213]: Load a CSV file into a DataFrame
+                      - generic [ref=e214]: DataFrame →
+                      - generic "DataFrame (DataFrame)" [ref=e215]
+                  - group [ref=e216]:
+                    - generic [ref=e217]:
+                      - generic "DataFrame (DataFrame)" [ref=e218]
+                      - generic [ref=e219]:
+                        - generic [ref=e220]: 🕳️
+                        - generic [ref=e221]: Missing Values
+                      - generic [ref=e222]:
+                        - generic [ref=e223]: ← DataFrame
+                        - paragraph [ref=e224]: Handle missing / null values
+                      - generic [ref=e225]: DataFrame →
+                      - generic "DataFrame (DataFrame)" [ref=e226]
+                  - group [ref=e227]:
+                    - generic [ref=e228]:
+                      - generic "DataFrame (DataFrame)" [ref=e229]
+                      - generic [ref=e230]:
+                        - generic [ref=e231]: ✂️
+                        - generic [ref=e232]: Train / Test Split
+                      - generic [ref=e233]:
+                        - generic [ref=e234]: ← DataFrame
+                        - paragraph [ref=e235]: Split DataFrame into train and test sets
+                      - generic [ref=e236]: Train DataFrame →
+                      - generic [ref=e237]: Test DataFrame →
+                      - generic "Train DataFrame (DataFrame)" [ref=e238]
+                      - generic "Test DataFrame (DataFrame)" [ref=e239]
+                  - group [ref=e240]:
+                    - generic [ref=e241]:
+                      - generic "Train DataFrame (DataFrame)" [ref=e242]
+                      - generic [ref=e243]:
+                        - generic [ref=e244]: 🌲
+                        - generic [ref=e245]: Random Forest
+                      - generic [ref=e246]:
+                        - generic [ref=e247]: ← Train DataFrame
+                        - paragraph [ref=e248]: scikit-learn RandomForestClassifier / Regressor
+                      - generic [ref=e249]: Trained Model →
+                      - generic "Trained Model (Model)" [ref=e250]
+                  - group [ref=e251]:
+                    - generic [ref=e252]:
+                      - generic "Model (Model)" [ref=e253]
+                      - generic "Test DataFrame (DataFrame)" [ref=e254]
+                      - generic [ref=e255]:
+                        - generic [ref=e256]: 📋
+                        - generic [ref=e257]: Classification Report
+                      - generic [ref=e258]:
+                        - generic [ref=e259]: ← Model
+                        - generic [ref=e260]: ← Test DataFrame
+                        - paragraph [ref=e261]: Accuracy, precision, recall, F1, confusion matrix
+                      - generic [ref=e262]: Metrics →
+                      - generic "Metrics (Metrics)" [ref=e263]
+                  - group [ref=e264]:
+                    - generic [ref=e265]:
+                      - generic "Trained Model (Model)" [ref=e266]
+                      - generic "Metrics (Metrics)" [ref=e267]
+                      - generic [ref=e268]:
+                        - generic [ref=e269]: 📦
+                        - generic [ref=e270]: MLflow Registry
+                      - generic [ref=e271]:
+                        - generic [ref=e272]: ← Trained Model
+                        - generic [ref=e273]: ← Metrics
+                        - paragraph [ref=e274]: Log and register the model to MLflow
+                  - group [ref=e275]:
+                    - generic [ref=e276]:
+                      - generic "Reference DataFrame (DataFrame)" [ref=e277]
+                      - generic "Current DataFrame (DataFrame)" [ref=e278]
+                      - generic [ref=e279]:
+                        - generic [ref=e280]: 📡
+                        - generic [ref=e281]: Data Drift (Evidently)
+                      - generic [ref=e282]:
+                        - generic [ref=e283]: ← Reference DataFrame
+                        - generic [ref=e284]: ← Current DataFrame
+                        - paragraph [ref=e285]: Detect data drift between reference and current datasets
+                      - generic [ref=e286]: Drift Metrics →
+                      - generic "Drift Metrics (Metrics)" [ref=e287]
+            - img
+            - generic "Control Panel" [ref=e288]:
+              - button "Zoom In" [ref=e289] [cursor=pointer]:
+                - img [ref=e290]
+              - button "Zoom Out" [disabled]:
+                - img
+              - button "Fit View" [ref=e292] [cursor=pointer]:
+                - img [ref=e293]
+              - button "Toggle Interactivity" [ref=e295] [cursor=pointer]:
+                - img [ref=e296]
+            - img "Mini Map" [ref=e299]
+    - complementary [ref=e308]:
+      - paragraph [ref=e309]: Select a node to configure it
+```

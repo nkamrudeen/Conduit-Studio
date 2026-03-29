@@ -1,18 +1,23 @@
-# ── Classification Evaluation ────────────────────────────────────────────────
+# ── Classification Evaluation ─────────────────────────────────────────────────
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 {% if config.plot_confusion_matrix %}
 import matplotlib.pyplot as plt
 import seaborn as sns
 {% endif %}
 
-y_pred_{{ node_id }} = model_{{ node_id }}.predict(X_test_{{ node_id }})
-_acc_{{ node_id }} = accuracy_score(y_test_{{ node_id }}, y_pred_{{ node_id }})
+{% set model_v = inputs['model'] if 'model' in inputs else input_var %}
+{% set df_test_v = inputs['df_test'] if 'df_test' in inputs else input_var %}
+
+_X_test_{{ node_id }} = {{ df_test_v }}.drop(columns=["{{ config.target_column }}"])
+_y_test_{{ node_id }} = {{ df_test_v }}["{{ config.target_column }}"]
+_y_pred_{{ node_id }} = {{ model_v }}.predict(_X_test_{{ node_id }})
+_acc_{{ node_id }} = accuracy_score(_y_test_{{ node_id }}, _y_pred_{{ node_id }})
 print(f"[Evaluation] Accuracy: {_acc_{{ node_id }}:.4f}")
 {% if config.output_report %}
-print(classification_report(y_test_{{ node_id }}, y_pred_{{ node_id }}))
+print(classification_report(_y_test_{{ node_id }}, _y_pred_{{ node_id }}))
 {% endif %}
 {% if config.plot_confusion_matrix %}
-_cm_{{ node_id }} = confusion_matrix(y_test_{{ node_id }}, y_pred_{{ node_id }})
+_cm_{{ node_id }} = confusion_matrix(_y_test_{{ node_id }}, _y_pred_{{ node_id }})
 fig_{{ node_id }}, ax_{{ node_id }} = plt.subplots(figsize=(8, 6))
 sns.heatmap(_cm_{{ node_id }}, annot=True, fmt="d", cmap="Blues", ax=ax_{{ node_id }})
 ax_{{ node_id }}.set_title("Confusion Matrix")

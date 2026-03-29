@@ -1,8 +1,8 @@
 {
-  "name": "ai-ide",
+  "name": "conduit-studio",
   "private": true,
   "version": "0.1.0",
-  "description": "Open-source drag-and-drop MLOps + LLMOps visual IDE",
+  "description": "Conduit Studio — Open-source drag-and-drop MLOps + LLMOps visual pipeline IDE",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "turbo dev",

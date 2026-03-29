@@ -1,0 +1,11 @@
+# ── Column Selector ───────────────────────────────────────────────────────────
+import pandas as pd
+
+df_{{ node_id }} = {{ input_var }}.copy()
+{% if config.columns %}
+df_{{ node_id }} = df_{{ node_id }}[{{ config.columns | tojson }}]
+{% endif %}
+{% if config.drop_columns %}
+df_{{ node_id }} = df_{{ node_id }}.drop(columns={{ config.drop_columns | tojson }}, errors="ignore")
+{% endif %}
+print(f"[Column Selector] {df_{{ node_id }}.shape[1]} columns remaining")

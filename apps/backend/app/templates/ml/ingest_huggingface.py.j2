@@ -1,0 +1,10 @@
+# ── HuggingFace Dataset Ingest ────────────────────────────────────────────────
+from datasets import load_dataset
+
+_hf_dataset_{{ node_id }} = load_dataset(
+    "{{ config.dataset_name }}",
+    {% if config.subset %}"{{ config.subset }}",{% endif %}
+    split="{{ config.split | default('train') }}",
+)
+df_{{ node_id }} = _hf_dataset_{{ node_id }}.to_pandas()
+print(f"[HuggingFace] Loaded '{config.dataset_name}' — {len(df_{{ node_id }})} rows")

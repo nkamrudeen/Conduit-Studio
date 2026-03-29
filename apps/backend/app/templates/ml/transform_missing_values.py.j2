@@ -1,0 +1,37 @@
+# ── Missing Value Handler ─────────────────────────────────────────────────────
+import pandas as pd
+
+df_{{ node_id }} = {{ input_var }}.copy()
+{% set cols = config.columns if config.columns else None %}
+{% set strategy = config.strategy | default('drop_rows') %}
+
+{% if strategy == 'drop_rows' %}
+_before_{{ node_id }} = len(df_{{ node_id }})
+df_{{ node_id }} = df_{{ node_id }}.dropna({% if cols %}subset={{ cols | tojson }}{% endif %})
+print(f"[Missing Values] Dropped {_before_{{ node_id }} - len(df_{{ node_id }})} rows with nulls")
+
+{% elif strategy == 'drop_cols' %}
+df_{{ node_id }} = df_{{ node_id }}.dropna(axis=1)
+print(f"[Missing Values] Dropped columns with any nulls. Remaining: {df_{{ node_id }}.shape[1]}")
+
+{% elif strategy == 'fill_mean' %}
+_fill_cols_{{ node_id }} = {{ cols | tojson }} if {{ cols | tojson }} else df_{{ node_id }}.select_dtypes(include="number").columns.tolist()
+df_{{ node_id }}[_fill_cols_{{ node_id }}] = df_{{ node_id }}[_fill_cols_{{ node_id }}].fillna(df_{{ node_id }}[_fill_cols_{{ node_id }}].mean())
+print("[Missing Values] Filled with column means")
+
+{% elif strategy == 'fill_median' %}
+_fill_cols_{{ node_id }} = {{ cols | tojson }} if {{ cols | tojson }} else df_{{ node_id }}.select_dtypes(include="number").columns.tolist()
+df_{{ node_id }}[_fill_cols_{{ node_id }}] = df_{{ node_id }}[_fill_cols_{{ node_id }}].fillna(df_{{ node_id }}[_fill_cols_{{ node_id }}].median())
+print("[Missing Values] Filled with column medians")
+
+{% elif strategy == 'fill_mode' %}
+_fill_cols_{{ node_id }} = {{ cols | tojson }} if {{ cols | tojson }} else df_{{ node_id }}.columns.tolist()
+for _col in _fill_cols_{{ node_id }}:
+    df_{{ node_id }}[_col] = df_{{ node_id }}[_col].fillna(df_{{ node_id }}[_col].mode().iloc[0])
+print("[Missing Values] Filled with column modes")
+
+{% elif strategy == 'fill_constant' %}
+_fill_cols_{{ node_id }} = {{ cols | tojson }} if {{ cols | tojson }} else df_{{ node_id }}.columns.tolist()
+df_{{ node_id }}[_fill_cols_{{ node_id }}] = df_{{ node_id }}[_fill_cols_{{ node_id }}].fillna("{{ config.fill_value | default(0) }}")
+print(f"[Missing Values] Filled with constant value: {{ config.fill_value | default(0) }}")
+{% endif %}

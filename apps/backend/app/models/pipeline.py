@@ -20,9 +20,9 @@ class PipelineNode(BaseModel):
 class PipelineEdge(BaseModel):
     id: str
     source: str
-    sourceHandle: str
+    sourceHandle: str = ""
     target: str
-    targetHandle: str
+    targetHandle: str = ""
 
 
 class PipelineDAG(BaseModel):
@@ -31,8 +31,8 @@ class PipelineDAG(BaseModel):
     pipeline: Literal["ml", "llm"]
     nodes: list[PipelineNode]
     edges: list[PipelineEdge]
-    createdAt: str
-    updatedAt: str
+    createdAt: str = ""
+    updatedAt: str = ""
 
 
 class PipelineRunRequest(BaseModel):

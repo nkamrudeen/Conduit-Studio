@@ -1,7 +1,7 @@
 [project]
-name = "ai-ide-backend"
+name = "conduit-studio-backend"
 version = "0.1.0"
-description = "AI-IDE FastAPI backend — execution engine, code generator, data connectors"
+description = "Conduit Studio FastAPI backend — execution engine, code generator, data connectors"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
@@ -46,11 +46,8 @@ dev-dependencies = [
     "httpx>=0.28.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
+    "pyinstaller>=6.11.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,7 @@
+# ── Web Loader ────────────────────────────────────────────────────────────────
+from langchain_community.document_loaders import WebBaseLoader
+
+_urls_{{ node_id }} = {{ config.urls | tojson }}
+_loader_{{ node_id }} = WebBaseLoader(_urls_{{ node_id }})
+docs_{{ node_id }} = _loader_{{ node_id }}.load()
+print(f"[Web Loader] Loaded {len(docs_{{ node_id }})} documents from {len(_urls_{{ node_id }})} URLs")

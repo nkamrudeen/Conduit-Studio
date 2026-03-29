@@ -1,0 +1,37 @@
+# ── Fine-tuning: Merge LoRA Adapter & Push to Hub ────────────────────────────
+import os
+from peft import PeftModel
+{% if config.push_to_hub | default(True) %}
+from huggingface_hub import login
+{% endif %}
+
+{% set model_v = inputs['model'] if 'model' in inputs else input_var %}
+
+{% if config.push_to_hub | default(True) %}
+_hf_token = os.environ.get("{{ config.token_env | default('HF_TOKEN') }}")
+if _hf_token:
+    login(token=_hf_token)
+{% endif %}
+
+# Load adapter and merge into base model
+_peft_model_{{ node_id }} = PeftModel.from_pretrained(
+    model_base_{{ node_id }},
+    "{{ config.output_dir | default('./fine_tuned_model') }}",
+)
+_merged_{{ node_id }} = _peft_model_{{ node_id }}.merge_and_unload()
+print("[MergePush] LoRA weights merged into base model.")
+
+{% if config.save_merged_local | default(True) %}
+_merged_{{ node_id }}.save_pretrained("{{ config.merged_output_dir | default('./merged_model') }}")
+tokenizer_{{ node_id }}.save_pretrained("{{ config.merged_output_dir | default('./merged_model') }}")
+print(f"[MergePush] Saved locally to {{ config.merged_output_dir | default('./merged_model') }}")
+{% endif %}
+
+{% if config.push_to_hub | default(True) and config.repo_id %}
+_merged_{{ node_id }}.push_to_hub(
+    "{{ config.repo_id }}",
+    private={{ config.private | default(False) | tojson }},
+)
+tokenizer_{{ node_id }}.push_to_hub("{{ config.repo_id }}")
+print(f"[MergePush] Pushed to HuggingFace Hub: {{ config.repo_id }}")
+{% endif %}

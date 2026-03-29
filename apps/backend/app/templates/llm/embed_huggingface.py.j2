@@ -1,0 +1,9 @@
+# ── HuggingFace Sentence Transformer Embeddings ───────────────────────────────
+from langchain_huggingface import HuggingFaceEmbeddings
+
+embeddings_{{ node_id }} = HuggingFaceEmbeddings(
+    model_name="{{ config.model_name | default('sentence-transformers/all-MiniLM-L6-v2') }}",
+    model_kwargs={"device": "{{ config.device | default('cpu') }}"},
+    encode_kwargs={"normalize_embeddings": True},
+)
+print(f"[Embeddings] Loaded HuggingFace model: {{ config.model_name | default('all-MiniLM-L6-v2') }}")

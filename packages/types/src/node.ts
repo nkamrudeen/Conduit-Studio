@@ -19,6 +19,8 @@ export type NodeCategory =
   | 'evaluate'
   | 'deploy'
   | 'monitor'
+  | 'experiment'
+  | 'finetune'
   | 'chunk'
   | 'embed'
   | 'vectorstore'

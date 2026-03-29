@@ -1,0 +1,39 @@
+# ── LLM FastAPI Endpoint ──────────────────────────────────────────────────────
+_LLM_SERVE_CODE_{{ node_id }} = '''
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+import uvicorn
+
+# Paste chain definition here
+# chain = ...
+
+app = FastAPI(title="AI-IDE LLM API")
+
+class QueryRequest(BaseModel):
+    query: str
+    stream: bool = False
+
+@app.post("{{ config.route | default('/ask') }}")
+async def ask(request: QueryRequest):
+    {% if config.enable_streaming %}
+    if request.stream:
+        async def _stream():
+            async for chunk in chain.astream({"query": request.query}):
+                yield chunk.get("answer", "")
+        return StreamingResponse(_stream(), media_type="text/event-stream")
+    {% endif %}
+    result = chain.invoke({"query": request.query})
+    return {"answer": result.get("answer", str(result))}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="{{ config.host | default('0.0.0.0') }}", port={{ config.port | default(8080) }})
+'''
+
+with open("llm_api.py", "w") as _f:
+    _f.write(_LLM_SERVE_CODE_{{ node_id }})
+print("[LLM Deploy] API script written to llm_api.py — run: python llm_api.py")

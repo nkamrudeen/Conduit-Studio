@@ -1,0 +1,23 @@
+# ── Outlier Remover ───────────────────────────────────────────────────────────
+import pandas as pd
+import numpy as np
+
+df_{{ node_id }} = {{ input_var }}.copy()
+_before_{{ node_id }} = len(df_{{ node_id }})
+_num_cols_{{ node_id }} = {{ config.columns | tojson }} if {{ config.columns | tojson }} else df_{{ node_id }}.select_dtypes(include="number").columns.tolist()
+
+{% if config.method | default('iqr') == 'iqr' %}
+_q1_{{ node_id }} = df_{{ node_id }}[_num_cols_{{ node_id }}].quantile(0.25)
+_q3_{{ node_id }} = df_{{ node_id }}[_num_cols_{{ node_id }}].quantile(0.75)
+_iqr_{{ node_id }} = _q3_{{ node_id }} - _q1_{{ node_id }}
+_thresh_{{ node_id }} = {{ config.threshold | default(1.5) }}
+_mask_{{ node_id }} = ~((df_{{ node_id }}[_num_cols_{{ node_id }}] < (_q1_{{ node_id }} - _thresh_{{ node_id }} * _iqr_{{ node_id }})) |
+                        (df_{{ node_id }}[_num_cols_{{ node_id }}] > (_q3_{{ node_id }} + _thresh_{{ node_id }} * _iqr_{{ node_id }}))).any(axis=1)
+{% else %}
+from scipy import stats
+_z_{{ node_id }} = np.abs(stats.zscore(df_{{ node_id }}[_num_cols_{{ node_id }}].fillna(0)))
+_mask_{{ node_id }} = (_z_{{ node_id }} < {{ config.threshold | default(3.0) }}).all(axis=1)
+{% endif %}
+
+df_{{ node_id }} = df_{{ node_id }}[_mask_{{ node_id }}].reset_index(drop=True)
+print(f"[Outlier Remover] {_before_{{ node_id }}} → {len(df_{{ node_id }})} rows (removed {_before_{{ node_id }} - len(df_{{ node_id }})} outliers)")

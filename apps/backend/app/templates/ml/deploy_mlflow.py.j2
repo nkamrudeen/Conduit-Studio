@@ -1,21 +1,24 @@
-# ── MLflow Model Registration ────────────────────────────────────────────────
+# ── MLflow Model Registration ─────────────────────────────────────────────────
 import mlflow
 import mlflow.sklearn
 
+{% set model_v = inputs['model'] if 'model' in inputs else input_var %}
+{% set metrics_v = inputs['metrics'] if 'metrics' in inputs else None %}
+
 mlflow.set_tracking_uri("{{ config.mlflow_tracking_uri | default('http://localhost:5000') }}")
-mlflow.set_experiment("{{ config.experiment_name }}")
+mlflow.set_experiment("{{ config.experiment_name | default('my_experiment') }}")
 
 with mlflow.start_run():
-    {% if 'metrics_' in var %}
-    for _k, _v in metrics_{{ node_id }}.items():
+    {% if metrics_v %}
+    for _k, _v in {{ metrics_v }}.items():
         mlflow.log_metric(_k, _v)
     {% endif %}
     {% if config.tags %}
     mlflow.set_tags({{ config.tags | tojson }})
     {% endif %}
     mlflow.sklearn.log_model(
-        model_{{ node_id }},
+        {{ model_v }},
         artifact_path="model",
-        registered_model_name="{{ config.model_name }}",
+        registered_model_name="{{ config.model_name | default('my_model') }}",
     )
-    print(f"[MLflow] Model registered as '{{ config.model_name }}'")
+    print(f"[MLflow] Model registered as '{{ config.model_name | default('my_model') }}'")

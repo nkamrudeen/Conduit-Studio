@@ -2,7 +2,20 @@ import React, { useEffect, useState } from 'react'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
+import { CheckCircle2, XCircle, Loader2, Table } from 'lucide-react'
 import type { JSONSchema7 } from 'json-schema'
+
+// Map node definitionId prefix → connector_id used by the backend API
+const CONNECTOR_MAP: Record<string, string> = {
+  'ml.ingest.csv': 'local',
+  'ml.ingest.parquet': 'local',
+  'ml.ingest.s3': 's3',
+  'ml.ingest.azure': 'azure',
+  'ml.ingest.gcs': 'gcs',
+  'ml.ingest.postgres': 'postgres',
+  'ml.ingest.huggingface': 'local',
+  'llm.ingest.s3_docs': 's3',
+}
 
 export function NodeInspector() {
   const { dag, selectedNodeId, updateNodeConfig } = usePipelineStore()
@@ -10,14 +23,19 @@ export function NodeInspector() {
   const definition = node ? nodeRegistry.get(node.definitionId) : undefined
 
   const [config, setConfig] = useState<Record<string, unknown>>(node?.config ?? {})
+  const [connTest, setConnTest] = useState<'idle' | 'loading' | 'ok' | 'fail'>('idle')
+  const [preview, setPreview] = useState<{ columns: string[]; rows: Record<string, unknown>[] } | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
     setConfig(node?.config ?? {})
+    setConnTest('idle')
+    setPreview(null)
   }, [selectedNodeId, node])
 
   if (!node || !definition) {
     return (
-      <aside className="flex h-full w-72 shrink-0 flex-col items-center justify-center border-l border-border bg-card text-muted-foreground">
+      <aside data-testid="node-inspector" className="flex h-full w-72 shrink-0 flex-col items-center justify-center border-l border-border bg-card text-muted-foreground">
         <p className="text-xs">Select a node to configure it</p>
       </aside>
     )
@@ -29,10 +47,46 @@ export function NodeInspector() {
     updateNodeConfig(node.id, next)
   }
 
+  const connectorId = CONNECTOR_MAP[node.definitionId]
+  const isIngestNode = definition.category === 'ingest' && !!connectorId
+
+  const testConnection = async () => {
+    setConnTest('loading')
+    try {
+      const res = await fetch('/api/connectors/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connector_id: connectorId, config }),
+      })
+      const data = await res.json()
+      setConnTest(data.success ? 'ok' : 'fail')
+    } catch {
+      setConnTest('fail')
+    }
+  }
+
+  const previewData = async () => {
+    setPreviewLoading(true)
+    setPreview(null)
+    try {
+      const res = await fetch('/api/connectors/preview?n_rows=20', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connector_id: connectorId, config }),
+      })
+      const data = await res.json()
+      setPreview(data)
+    } catch {
+      // ignore — backend may not be running
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const schema = definition.configSchema as JSONSchema7
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-l border-border bg-card">
+    <aside data-testid="node-inspector" className="flex h-full w-72 shrink-0 flex-col border-l border-border bg-card">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="text-lg">{definition.icon}</span>
@@ -61,6 +115,62 @@ export function NodeInspector() {
                 onChange={(v) => handleChange(key, v)}
               />
             ))}
+
+          {/* Connector actions (ingest nodes only) */}
+          {isIngestNode && (
+            <div className="space-y-2 rounded-md border border-border p-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Data Source</p>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={testConnection}
+                  disabled={connTest === 'loading'}
+                  className="flex flex-1 items-center justify-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-60"
+                >
+                  {connTest === 'loading' && <Loader2 size={10} className="animate-spin" />}
+                  {connTest === 'ok' && <CheckCircle2 size={10} className="text-green-500" />}
+                  {connTest === 'fail' && <XCircle size={10} className="text-red-500" />}
+                  {connTest === 'idle' && null}
+                  Test Connection
+                </button>
+                <button
+                  onClick={previewData}
+                  disabled={previewLoading}
+                  className="flex flex-1 items-center justify-center gap-1 rounded border border-border bg-background px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-60"
+                >
+                  {previewLoading ? <Loader2 size={10} className="animate-spin" /> : <Table size={10} />}
+                  Preview
+                </button>
+              </div>
+
+              {/* Preview table */}
+              {preview && preview.rows.length > 0 && (
+                <div className="overflow-x-auto rounded border border-border">
+                  <table className="w-full text-[10px]">
+                    <thead className="bg-muted">
+                      <tr>
+                        {preview.columns.map((col) => (
+                          <th key={col} className="border-r border-border px-1.5 py-1 text-left font-medium last:border-r-0">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {preview.rows.slice(0, 5).map((row, i) => (
+                        <tr key={i} className="border-t border-border even:bg-muted/30">
+                          {preview.columns.map((col) => (
+                            <td key={col} className="max-w-[60px] truncate border-r border-border px-1.5 py-0.5 last:border-r-0">
+                              {String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Port info */}
           {definition.inputs.length > 0 && (
@@ -164,7 +274,6 @@ function FormField({ fieldKey, schema, required, value, onChange }: FormFieldPro
     )
   }
 
-  // Default: string / textarea
   const isLong = (schema.description?.length ?? 0) > 40 || fieldKey.includes('prompt') || fieldKey.includes('query')
   return (
     <div>

@@ -1,0 +1,18 @@
+# ── FAISS Vector Store ────────────────────────────────────────────────────────
+from langchain_community.vectorstores import FAISS
+
+{% set chunks_v = inputs['chunks'] if 'chunks' in inputs else input_var %}
+{% set embed_v = inputs['embeddings'] if 'embeddings' in inputs else None %}
+
+vectorstore_{{ node_id }} = FAISS.from_documents(
+    documents={{ chunks_v }},
+    {% if embed_v %}
+    embedding={{ embed_v }},
+    {% endif %}
+)
+{% if config.save_path %}
+vectorstore_{{ node_id }}.save_local("{{ config.save_path }}")
+print(f"[FAISS] Stored {len({{ chunks_v }})} chunks, saved to {{ config.save_path }}")
+{% else %}
+print(f"[FAISS] Stored {len({{ chunks_v }})} chunks in memory")
+{% endif %}

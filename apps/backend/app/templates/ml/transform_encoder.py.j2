@@ -1,0 +1,40 @@
+# ── Category Encoder ─────────────────────────────────────────────────────────
+import pandas as pd
+{% set encoding = config.encoding | default('onehot') %}
+{% if encoding == 'onehot' %}
+from sklearn.preprocessing import OneHotEncoder
+import numpy as np
+
+df_{{ node_id }} = {{ input_var }}.copy()
+_cat_cols_{{ node_id }} = {{ config.columns | tojson }} if {{ config.columns | tojson }} else df_{{ node_id }}.select_dtypes(include="object").columns.tolist()
+_ohe_{{ node_id }} = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+_encoded_{{ node_id }} = pd.DataFrame(
+    _ohe_{{ node_id }}.fit_transform(df_{{ node_id }}[_cat_cols_{{ node_id }}]),
+    columns=_ohe_{{ node_id }}.get_feature_names_out(_cat_cols_{{ node_id }}),
+    index=df_{{ node_id }}.index,
+)
+{% if config.drop_original %}
+df_{{ node_id }} = df_{{ node_id }}.drop(columns=_cat_cols_{{ node_id }}).join(_encoded_{{ node_id }})
+{% else %}
+df_{{ node_id }} = df_{{ node_id }}.join(_encoded_{{ node_id }})
+{% endif %}
+print(f"[Encoder] One-hot encoded {len(_cat_cols_{{ node_id }})} columns → {df_{{ node_id }}.shape[1]} total")
+
+{% elif encoding == 'label' %}
+from sklearn.preprocessing import LabelEncoder
+
+df_{{ node_id }} = {{ input_var }}.copy()
+_cat_cols_{{ node_id }} = {{ config.columns | tojson }} if {{ config.columns | tojson }} else df_{{ node_id }}.select_dtypes(include="object").columns.tolist()
+for _col in _cat_cols_{{ node_id }}:
+    df_{{ node_id }}[_col] = LabelEncoder().fit_transform(df_{{ node_id }}[_col].astype(str))
+print(f"[Encoder] Label-encoded {len(_cat_cols_{{ node_id }})} columns")
+
+{% elif encoding == 'ordinal' %}
+from sklearn.preprocessing import OrdinalEncoder
+
+df_{{ node_id }} = {{ input_var }}.copy()
+_cat_cols_{{ node_id }} = {{ config.columns | tojson }} if {{ config.columns | tojson }} else df_{{ node_id }}.select_dtypes(include="object").columns.tolist()
+_oe_{{ node_id }} = OrdinalEncoder()
+df_{{ node_id }}[_cat_cols_{{ node_id }}] = _oe_{{ node_id }}.fit_transform(df_{{ node_id }}[_cat_cols_{{ node_id }}])
+print(f"[Encoder] Ordinal-encoded {len(_cat_cols_{{ node_id }})} columns")
+{% endif %}

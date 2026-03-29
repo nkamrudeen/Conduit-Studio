@@ -1,0 +1,47 @@
+# ── FastAPI Model Serving Endpoint ────────────────────────────────────────────
+import joblib
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel
+import pandas as pd
+
+{% set model_v = inputs['model'] if 'model' in inputs else input_var %}
+
+# Save model first
+joblib.dump({{ model_v }}, "{{ config.model_path | default('model.pkl') }}")
+print(f"[Deploy] Model saved to {{ config.model_path | default('model.pkl') }}")
+
+# --- Generated serving script (save as serve.py and run separately) ---
+_SERVE_CODE_{{ node_id }} = """
+import joblib
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel
+import pandas as pd
+from typing import Any
+
+app = FastAPI(title="AI-IDE Model API")
+model = joblib.load("{{ config.model_path | default('model.pkl') }}")
+
+class PredictRequest(BaseModel):
+    data: list[dict[str, Any]]
+
+class PredictResponse(BaseModel):
+    predictions: list
+
+@app.post("{{ config.route_prefix | default('/predict') }}", response_model=PredictResponse)
+def predict(request: PredictRequest):
+    df = pd.DataFrame(request.data)
+    preds = model.predict(df).tolist()
+    return PredictResponse(predictions=preds)
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="{{ config.host | default('0.0.0.0') }}", port={{ config.port | default(8080) }})
+"""
+with open("serve.py", "w") as _f:
+    _f.write(_SERVE_CODE_{{ node_id }})
+print("[Deploy] FastAPI serving script written to serve.py — run: python serve.py")

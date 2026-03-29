@@ -1,0 +1,35 @@
+# ── XGBoost Training ─────────────────────────────────────────────────────────
+from sklearn.model_selection import train_test_split as _tts_xgb
+import pandas as pd
+{% if config.task == 'regression' %}
+from xgboost import XGBRegressor
+{% else %}
+from xgboost import XGBClassifier
+{% endif %}
+
+_df_{{ node_id }} = {{ input_var }}
+_X_{{ node_id }} = _df_{{ node_id }}.drop(columns=["{{ config.target_column }}"])
+_y_{{ node_id }} = _df_{{ node_id }}["{{ config.target_column }}"]
+_X_tr_{{ node_id }}, _X_va_{{ node_id }}, _y_tr_{{ node_id }}, _y_va_{{ node_id }} = _tts_xgb(
+    _X_{{ node_id }}, _y_{{ node_id }}, test_size=0.1,
+    random_state={{ config.random_state | default(42) }}
+)
+
+{% if config.task == 'regression' %}
+model_{{ node_id }} = XGBRegressor(
+{% else %}
+model_{{ node_id }} = XGBClassifier(
+{% endif %}
+    n_estimators={{ config.n_estimators | default(100) }},
+    learning_rate={{ config.learning_rate | default(0.1) }},
+    max_depth={{ config.max_depth | default(6) }},
+    random_state={{ config.random_state | default(42) }},
+    eval_metric="logloss",
+    verbosity=0,
+)
+model_{{ node_id }}.fit(
+    _X_tr_{{ node_id }}, _y_tr_{{ node_id }},
+    eval_set=[(_X_va_{{ node_id }}, _y_va_{{ node_id }})],
+    verbose=False,
+)
+print(f"[XGBoost] Best iteration: {model_{{ node_id }}.best_iteration}")

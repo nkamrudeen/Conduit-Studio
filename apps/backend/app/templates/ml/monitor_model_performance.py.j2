@@ -1,0 +1,40 @@
+# ── Model Performance Monitor ─────────────────────────────────────────────────
+import json
+import datetime
+{% set metrics_list = config.metrics | default(['accuracy']) %}
+
+{% set model_v = inputs['model'] if 'model' in inputs else input_var %}
+{% set df_v = inputs['df_current'] if 'df_current' in inputs else input_var %}
+
+_X_cur_{{ node_id }} = {{ df_v }}.drop(columns=["{{ config.target_column }}"])
+_y_cur_{{ node_id }} = {{ df_v }}["{{ config.target_column }}"]
+_y_pred_{{ node_id }} = {{ model_v }}.predict(_X_cur_{{ node_id }})
+
+from sklearn import metrics as _skmetrics
+_results_{{ node_id }} = {}
+{% if 'accuracy' in metrics_list %}
+_results_{{ node_id }}["accuracy"] = _skmetrics.accuracy_score(_y_cur_{{ node_id }}, _y_pred_{{ node_id }})
+{% endif %}
+{% if 'f1' in metrics_list %}
+_results_{{ node_id }}["f1"] = _skmetrics.f1_score(_y_cur_{{ node_id }}, _y_pred_{{ node_id }}, average="weighted")
+{% endif %}
+{% if 'rmse' in metrics_list %}
+import numpy as np
+_results_{{ node_id }}["rmse"] = float(np.sqrt(_skmetrics.mean_squared_error(_y_cur_{{ node_id }}, _y_pred_{{ node_id }})))
+{% endif %}
+
+print(f"[Performance Monitor] {_results_{{ node_id }}}")
+
+# Alert if any metric drops below threshold
+_threshold_{{ node_id }} = {{ config.alert_threshold | default(0.8) }}
+for _metric, _val in _results_{{ node_id }}.items():
+    if _val < _threshold_{{ node_id }}:
+        print(f"⚠ ALERT: {_metric} = {_val:.4f} is below threshold {_threshold_{{ node_id }}}")
+        {% if config.alert_webhook %}
+        import urllib.request, json as _json
+        _payload = {"metric": _metric, "value": _val, "threshold": _threshold_{{ node_id }}, "ts": datetime.datetime.utcnow().isoformat()}
+        _req = urllib.request.Request("{{ config.alert_webhook }}", data=_json.dumps(_payload).encode(), headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(_req)
+        {% endif %}
+
+metrics_{{ node_id }} = _results_{{ node_id }}

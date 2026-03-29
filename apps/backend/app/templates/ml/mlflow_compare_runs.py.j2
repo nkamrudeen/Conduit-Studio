@@ -1,0 +1,20 @@
+# ── MLflow: Compare Runs ──────────────────────────────────────────────────────
+import mlflow
+import pandas as pd
+
+mlflow.set_tracking_uri("{{ config.tracking_uri | default('http://localhost:5000') }}")
+client_{{ node_id }} = mlflow.tracking.MlflowClient()
+experiment_{{ node_id }} = client_{{ node_id }}.get_experiment_by_name(
+    "{{ config.experiment_name | default('my_experiment') }}"
+)
+runs_{{ node_id }} = client_{{ node_id }}.search_runs(
+    experiment_ids=[experiment_{{ node_id }}.experiment_id],
+    order_by=["metrics.{{ config.sort_metric | default('accuracy') }} DESC"],
+    max_results={{ config.max_results | default(10) }},
+)
+df_{{ node_id }} = pd.DataFrame([
+    {**r.data.metrics, **r.data.params, "run_id": r.info.run_id, "status": r.info.status}
+    for r in runs_{{ node_id }}
+])
+print(f"[MLflow] Fetched {len(df_{{ node_id }})} runs from '{{ config.experiment_name | default('my_experiment') }}'")
+print(df_{{ node_id }}.to_string(index=False))

@@ -8,6 +8,7 @@ import { mlTrainNodes } from './ml/train'
 import { mlEvaluateNodes } from './ml/evaluate'
 import { mlDeployNodes } from './ml/deploy'
 import { mlMonitorNodes } from './ml/monitor'
+import { mlMlflowNodes } from './ml/mlflow'
 import { llmIngestNodes } from './llm/ingest'
 import { llmChunkNodes } from './llm/chunk'
 import { llmEmbedNodes } from './llm/embed'
@@ -15,6 +16,7 @@ import { llmVectorStoreNodes } from './llm/vectorstore'
 import { llmModelNodes } from './llm/llm'
 import { llmChainNodes } from './llm/chain'
 import { llmDeployNodes } from './llm/deploy'
+import { llmFinetuneNodes } from './llm/finetune'
 
 nodeRegistry.registerAll([
   ...mlIngestNodes,
@@ -23,6 +25,7 @@ nodeRegistry.registerAll([
   ...mlEvaluateNodes,
   ...mlDeployNodes,
   ...mlMonitorNodes,
+  ...mlMlflowNodes,
   ...llmIngestNodes,
   ...llmChunkNodes,
   ...llmEmbedNodes,
@@ -30,4 +33,5 @@ nodeRegistry.registerAll([
   ...llmModelNodes,
   ...llmChainNodes,
   ...llmDeployNodes,
+  ...llmFinetuneNodes,
 ])

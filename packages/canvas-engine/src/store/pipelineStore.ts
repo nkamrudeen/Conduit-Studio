@@ -1,39 +1,20 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import {
-  addEdge,
-  applyNodeChanges,
-  applyEdgeChanges,
-  type OnNodesChange,
-  type OnEdgesChange,
-  type OnConnect,
-  type NodeChange,
-  type EdgeChange,
-  type Connection,
-} from '@xyflow/react'
 import { v4 as uuid } from 'uuid'
 import type { PipelineDAG, PipelineNode, PipelineEdge, PipelineType } from '@ai-ide/types'
-
-export type CanvasNode = PipelineNode & {
-  type: string
-  data: PipelineNode
-}
-
-export type CanvasEdge = PipelineEdge
 
 interface PipelineState {
   dag: PipelineDAG
   selectedNodeId: string | null
 
-  // React Flow handlers
-  onNodesChange: OnNodesChange
-  onEdgesChange: OnEdgesChange
-  onConnect: OnConnect
-
   // Actions
-  addNode: (definitionId: string, position: { x: number; y: number }) => void
+  addNode: (definitionId: string, position: { x: number; y: number }) => string
   updateNodeConfig: (nodeId: string, config: Record<string, unknown>) => void
+  updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void
+  updateNodeStatus: (nodeId: string, status: 'idle' | 'running' | 'success' | 'error') => void
   removeNode: (nodeId: string) => void
+  removeEdge: (edgeId: string) => void
+  addEdge: (edge: PipelineEdge) => void
   selectNode: (nodeId: string | null) => void
   setDag: (dag: PipelineDAG) => void
   resetPipeline: (type: PipelineType) => void
@@ -54,49 +35,22 @@ export const usePipelineStore = create<PipelineState>()(
     dag: emptyDag('ml'),
     selectedNodeId: null,
 
-    onNodesChange: (changes: NodeChange[]) =>
-      set((state) => {
-        // Apply position/selection changes while keeping our extended data
-        const rfNodes = state.dag.nodes.map((n) => ({
-          id: n.id,
-          type: 'pipelineNode',
-          position: n.position,
-          data: n,
-        }))
-        const updated = applyNodeChanges(changes, rfNodes)
-        state.dag.nodes = updated.map((n) => ({
-          ...(n.data as unknown as PipelineNode),
-          position: n.position,
-        }))
-        state.dag.updatedAt = new Date().toISOString()
-      }),
-
-    onEdgesChange: (changes: EdgeChange[]) =>
-      set((state) => {
-        const rfEdges = state.dag.edges as unknown as Parameters<typeof applyEdgeChanges>[1]
-        state.dag.edges = applyEdgeChanges(changes, rfEdges) as unknown as PipelineEdge[]
-        state.dag.updatedAt = new Date().toISOString()
-      }),
-
-    onConnect: (connection: Connection) =>
-      set((state) => {
-        const rfEdges = state.dag.edges as unknown as Parameters<typeof addEdge>[1]
-        state.dag.edges = addEdge({ ...connection, id: uuid() }, rfEdges) as unknown as PipelineEdge[]
-        state.dag.updatedAt = new Date().toISOString()
-      }),
-
-    addNode: (definitionId, position) =>
+    addNode: (definitionId, position) => {
+      const id = uuid()
       set((state) => {
         const node: PipelineNode = {
-          id: uuid(),
+          id,
           definitionId,
           position,
           config: {},
           status: 'idle',
         }
         state.dag.nodes.push(node)
+        state.selectedNodeId = id
         state.dag.updatedAt = new Date().toISOString()
-      }),
+      })
+      return id
+    },
 
     updateNodeConfig: (nodeId, config) =>
       set((state) => {
@@ -107,6 +61,21 @@ export const usePipelineStore = create<PipelineState>()(
         }
       }),
 
+    updateNodePosition: (nodeId, position) =>
+      set((state) => {
+        const node = state.dag.nodes.find((n) => n.id === nodeId)
+        if (node) {
+          node.position = position
+          state.dag.updatedAt = new Date().toISOString()
+        }
+      }),
+
+    updateNodeStatus: (nodeId, status) =>
+      set((state) => {
+        const node = state.dag.nodes.find((n) => n.id === nodeId)
+        if (node) node.status = status
+      }),
+
     removeNode: (nodeId) =>
       set((state) => {
         state.dag.nodes = state.dag.nodes.filter((n) => n.id !== nodeId)
@@ -114,6 +83,18 @@ export const usePipelineStore = create<PipelineState>()(
           (e) => e.source !== nodeId && e.target !== nodeId
         )
         if (state.selectedNodeId === nodeId) state.selectedNodeId = null
+        state.dag.updatedAt = new Date().toISOString()
+      }),
+
+    removeEdge: (edgeId) =>
+      set((state) => {
+        state.dag.edges = state.dag.edges.filter((e) => e.id !== edgeId)
+        state.dag.updatedAt = new Date().toISOString()
+      }),
+
+    addEdge: (edge) =>
+      set((state) => {
+        state.dag.edges.push(edge)
         state.dag.updatedAt = new Date().toISOString()
       }),
 

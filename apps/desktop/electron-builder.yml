@@ -1,0 +1,51 @@
+appId: com.conduitsudio.desktop
+productName: Conduit Studio
+copyright: Copyright © 2024 Conduit Studio Contributors
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - dist/**/*
+  - node_modules/**/*
+  - "!node_modules/*/{CHANGELOG.md,README.md,readme.md}"
+
+extraResources:
+  # PyInstaller onedir bundle — built by running:
+  #   cd apps/backend && pyinstaller conduit-backend.spec
+  # The entire dist/conduit-backend/ folder (exe + all deps) is bundled here.
+  - from: ../../apps/backend/dist/conduit-backend
+    to: backend
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: assets/icon.ico
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: assets/icon.icns
+  category: public.app-category.developer-tools
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: assets/icon.png
+  category: Development
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+
+publish:
+  provider: github
+  owner: conduit-studio
+  repo: conduit-studio

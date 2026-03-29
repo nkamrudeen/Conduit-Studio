@@ -1,0 +1,18 @@
+# ── MLflow: Log Params & Metrics ──────────────────────────────────────────────
+import mlflow
+
+{% set metrics_v = inputs['metrics'] if 'metrics' in inputs else input_var %}
+
+{% if config.params %}
+mlflow.log_params({{ config.params | tojson }})
+{% endif %}
+{% if metrics_v %}
+for _k, _v in {{ metrics_v }}.items():
+    mlflow.log_metric(_k, _v)
+{% endif %}
+{% if config.artifacts %}
+{% for artifact in config.artifacts %}
+mlflow.log_artifact("{{ artifact }}")
+{% endfor %}
+{% endif %}
+print("[MLflow] Params and metrics logged.")

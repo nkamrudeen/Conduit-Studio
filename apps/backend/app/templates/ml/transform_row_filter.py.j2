@@ -1,0 +1,5 @@
+# ── Row Filter ────────────────────────────────────────────────────────────────
+df_{{ node_id }} = {{ input_var }}.copy()
+_before_{{ node_id }} = len(df_{{ node_id }})
+df_{{ node_id }} = df_{{ node_id }}.query("""{{ config.query }}""").reset_index(drop=True)
+print(f"[Row Filter] {_before_{{ node_id }}} → {len(df_{{ node_id }})} rows (query: {{ config.query }})")

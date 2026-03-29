@@ -1,0 +1,25 @@
+# ── Fine-tuning: LoRA Configuration ──────────────────────────────────────────
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig, TaskType, get_peft_model
+
+base_model_{{ node_id }} = "{{ config.base_model | default('meta-llama/Llama-3.2-1B-Instruct') }}"
+
+tokenizer_{{ node_id }} = AutoTokenizer.from_pretrained(base_model_{{ node_id }}, use_fast=True)
+if tokenizer_{{ node_id }}.pad_token is None:
+    tokenizer_{{ node_id }}.pad_token = tokenizer_{{ node_id }}.eos_token
+
+model_base_{{ node_id }} = AutoModelForCausalLM.from_pretrained(
+    base_model_{{ node_id }},
+    device_map="auto",
+    torch_dtype="auto",
+)
+
+config_{{ node_id }} = LoraConfig(
+    r={{ config.r | default(16) }},
+    lora_alpha={{ config.lora_alpha | default(32) }},
+    lora_dropout={{ config.lora_dropout | default(0.05) }},
+    target_modules={{ config.target_modules | default(['q_proj', 'v_proj', 'k_proj', 'o_proj']) | tojson }},
+    bias="{{ config.bias | default('none') }}",
+    task_type=TaskType.{{ config.task_type | default('CAUSAL_LM') }},
+)
+print(f"[LoRAConfig] Base model: {base_model_{{ node_id }}} | rank={config_{{ node_id }}.r}, alpha={config_{{ node_id }}.lora_alpha}")

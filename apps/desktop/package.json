@@ -1,0 +1,23 @@
+{
+  "name": "@ai-ide/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Conduit Studio Desktop App",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "concurrently \"tsc --watch\" \"electron .\"",
+    "build": "tsc",
+    "dist": "tsc && electron-builder",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.7"
+  }
+}

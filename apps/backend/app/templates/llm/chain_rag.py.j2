@@ -2,17 +2,22 @@
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
+{% set vs_v = inputs['vectorstore'] if 'vectorstore' in inputs else input_var %}
+{% set llm_v = inputs['llm'] if 'llm' in inputs else None %}
+
 _prompt_{{ node_id }} = PromptTemplate(
     input_variables=["context", "question"],
     template="{{ config.prompt_template | default('Answer based on context.\\n\\nContext: {context}\\n\\nQuestion: {question}') }}",
 )
 
-_retriever_{{ node_id }} = vectorstore_{{ node_id }}.as_retriever(
+_retriever_{{ node_id }} = {{ vs_v }}.as_retriever(
     search_kwargs={"k": {{ config.retriever_k | default(4) }}}
 )
 
 chain_{{ node_id }} = RetrievalQA.from_chain_type(
-    llm=llm_{{ node_id }},
+    {% if llm_v %}
+    llm={{ llm_v }},
+    {% endif %}
     chain_type="{{ config.chain_type | default('stuff') }}",
     retriever=_retriever_{{ node_id }},
     chain_type_kwargs={"prompt": _prompt_{{ node_id }}},

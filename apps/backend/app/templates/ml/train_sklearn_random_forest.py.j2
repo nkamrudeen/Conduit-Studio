@@ -1,9 +1,14 @@
-# ── Random Forest Training ───────────────────────────────────────────────────
+# ── Random Forest Training ────────────────────────────────────────────────────
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+import pandas as pd
+
+_df_{{ node_id }} = {{ input_var }}
+_X_{{ node_id }} = _df_{{ node_id }}.drop(columns=["{{ config.target_column }}"])
+_y_{{ node_id }} = _df_{{ node_id }}["{{ config.target_column }}"]
+
 {% if config.task == 'regression' %}
-from sklearn.ensemble import RandomForestRegressor
 model_{{ node_id }} = RandomForestRegressor(
 {% else %}
-from sklearn.ensemble import RandomForestClassifier
 model_{{ node_id }} = RandomForestClassifier(
 {% endif %}
     n_estimators={{ config.n_estimators | default(100) }},
@@ -11,5 +16,5 @@ model_{{ node_id }} = RandomForestClassifier(
     random_state={{ config.random_state | default(42) }},
     n_jobs=-1,
 )
-model_{{ node_id }}.fit(X_train_{{ node_id }}, y_train_{{ node_id }})
-print(f"[Random Forest] Training complete. OOB score: {getattr(model_{{ node_id }}, 'oob_score_', 'N/A')}")
+model_{{ node_id }}.fit(_X_{{ node_id }}, _y_{{ node_id }})
+print(f"[Random Forest] Training complete on {len(_X_{{ node_id }})} samples")

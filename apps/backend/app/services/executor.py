@@ -143,6 +143,29 @@ def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = No
     return [sys.executable, "-m", "pip", "install"] + flags + packages
 
 
+def _rewrite_localhost_for_docker(dag: dict[str, Any]) -> dict[str, Any]:
+    """Replace ``localhost`` / ``127.0.0.1`` in node config string values with
+    ``host.docker.internal`` so that services running on the host (MLflow,
+    databases, etc.) are reachable from inside the Docker container.
+
+    On Linux Docker the ``--add-host=host.docker.internal:host-gateway`` flag
+    must also be passed to ``docker run`` (see the executor below).
+    Mac/Windows Docker Desktop already resolves ``host.docker.internal`` natively.
+    """
+    import copy as _copy
+    dag_copy = _copy.deepcopy(dag)
+    for node in dag_copy.get("nodes", []):
+        cfg = node.get("config", {})
+        for key, val in cfg.items():
+            if isinstance(val, str):
+                cfg[key] = (
+                    val
+                    .replace("localhost", "host.docker.internal")
+                    .replace("127.0.0.1", "host.docker.internal")
+                )
+    return dag_copy
+
+
 def _prepare_dag_for_docker(dag: dict[str, Any], build_dir: str) -> dict[str, Any]:
     """Copy any absolute local file paths referenced by nodes into *build_dir*
     and rewrite those paths to bare filenames so the generated script uses
@@ -323,7 +346,10 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
 
         # Rewrite absolute file_path values to bare filenames; copies the
         # source files into tmp_dir so they end up in the Docker build context.
+        # Also rewrite localhost URIs → host.docker.internal so the container
+        # can reach host-side services (MLflow, databases, etc.).
         dag_for_docker = _prepare_dag_for_docker(dag, tmp_dir)
+        dag_for_docker = _rewrite_localhost_for_docker(dag_for_docker)
         dag_obj = PipelineDAG(**dag_for_docker)
 
         # ── 1. Generate code artefacts ────────────────────────────────────
@@ -398,7 +424,14 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
         run_rc = await _stream_subprocess(
-            [docker_exe, "run", "--rm", image_tag],
+            [
+                docker_exe, "run", "--rm",
+                # Allow the container to reach host-side services (MLflow, DBs, etc.)
+                # via host.docker.internal. On Linux this flag creates the mapping;
+                # Docker Desktop on Mac/Windows provides it natively.
+                "--add-host=host.docker.internal:host-gateway",
+                image_tag,
+            ],
             _on_run_line,
         )
 
@@ -581,6 +614,7 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
         # Create build context dir early — needed for file path rewriting.
         tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
         dag_for_docker = _prepare_dag_for_docker(dag, tmp_dir)
+        dag_for_docker = _rewrite_localhost_for_docker(dag_for_docker)
         dag_obj = PipelineDAG(**dag_for_docker)
 
         # ── 1. Generate code artefacts ────────────────────────────────────
@@ -670,7 +704,14 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
         run_rc = await _stream_subprocess(
-            [docker_exe, "run", "--rm", image_tag],
+            [
+                docker_exe, "run", "--rm",
+                # Allow the container to reach host-side services (MLflow, DBs, etc.)
+                # via host.docker.internal. On Linux this flag creates the mapping;
+                # Docker Desktop on Mac/Windows provides it natively.
+                "--add-host=host.docker.internal:host-gateway",
+                image_tag,
+            ],
             _on_run_line,
         )
 

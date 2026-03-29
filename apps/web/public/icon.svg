@@ -1,10 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <!-- Dark background radial glow -->
-    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#1a0533"/>
-      <stop offset="100%" stop-color="#0a0015"/>
-    </radialGradient>
     <!-- Hex fill gradient -->
     <linearGradient id="hex" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#c026d3"/>
@@ -33,14 +28,12 @@
     </filter>
   </defs>
 
-  <!-- Dark pill background -->
-  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
 
   <!-- Hexagon with neon glow -->
   <polygon
     points="16,2.5 27,8.8 27,23.2 16,29.5 5,23.2 5,8.8"
     fill="url(#hex)"
-    opacity="0.92"
+    opacity="1"
     filter="url(#neon)"
   />
 
@@ -48,13 +41,13 @@
   <polygon
     points="16,5.5 24.2,10.2 24.2,21.8 16,26.5 7.8,21.8 7.8,10.2"
     fill="none"
-    stroke="rgba(255,255,255,0.2)"
+    stroke="rgba(255,255,255,0.6)"
     stroke-width="0.6"
   />
 
   <!-- Connector lines -->
-  <line x1="13" y1="15.8" x2="14.3" y2="12.5" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
-  <line x1="17.7" y1="12.5" x2="19" y2="15.8" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/>
+  <line x1="13" y1="15.8" x2="14.3" y2="12.5" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+  <line x1="17.7" y1="12.5" x2="19" y2="15.8" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
 
   <!-- Pipeline nodes with neon glow -->
   <circle cx="10.8" cy="17.2" r="2.6" fill="#f0abfc" filter="url(#dot)"/>

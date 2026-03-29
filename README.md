@@ -10,6 +10,10 @@
   Jupyter notebooks, Kubeflow DSL, and Dockerfiles from the visual flow.
 </p>
 
+<p align="center">
+  <img src="apps/web/public/screenshot.svg" width="960" alt="Conduit Studio — IDE screenshot" />
+</p>
+
 ---
 
 ## Features

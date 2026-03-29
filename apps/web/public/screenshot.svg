@@ -1,0 +1,435 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 740" font-family="ui-sans-serif,system-ui,sans-serif">
+  <defs>
+    <!-- App background -->
+    <linearGradient id="appBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#080d1a"/>
+    </linearGradient>
+    <!-- Node header gradients -->
+    <linearGradient id="ingestHdr" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0e7490"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="transformHdr" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7e22ce"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+    <linearGradient id="trainHdr" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="evalHdr" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#065f46"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="deployHdr" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#9f1239"/>
+      <stop offset="100%" stop-color="#e11d48"/>
+    </linearGradient>
+    <!-- Canvas dot pattern -->
+    <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.8" fill="#1e293b"/>
+    </pattern>
+    <!-- Edge glow -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Node shadow -->
+    <filter id="nodeShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <!-- Inspector gradient -->
+    <linearGradient id="inspectorBadge" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7e22ce"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ═══════════════════════════════════════════════════════
+       APP SHELL
+  ════════════════════════════════════════════════════════ -->
+  <rect width="1280" height="740" fill="url(#appBg)" rx="10"/>
+
+  <!-- Top nav bar -->
+  <rect width="1280" height="40" fill="#0f172a" rx="0"/>
+  <rect y="39" width="1280" height="1" fill="#1e293b"/>
+
+  <!-- Logo + title -->
+  <image href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJoZXgiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjYzAyNmQzIi8+PHN0b3Agb2Zmc2V0PSI1MCUiIHN0b3AtY29sb3I9IiM3YzNhZWQiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMwODkxYjIiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cG9seWdvbiBwb2ludHM9IjE2LDIuNSAyNyw4LjggMjcsMjMuMiAxNiwyOS41IDUsMjMuMiA1LDguOCIgZmlsbD0idXJsKCNoZXgpIiBvcGFjaXR5PSIxIi8+PHBvbHlnb24gcG9pbnRzPSIxNiw1LjUgMjQuMiwxMC4yIDI0LjIsMjEuOCAxNiwyNi41IDcuOCwyMS44IDcuOCwxMC4yIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC42KSIgc3Ryb2tlLXdpZHRoPSIwLjYiLz48bGluZSB4MT0iMTMiIHkxPSIxNS44IiB4Mj0iMTQuMyIgeTI9IjEyLjUiIHN0cm9rZT0iI2U4NzlmOSIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxNy43IiB5MT0iMTIuNSIgeDI9IjE5IiB5Mj0iMTUuOCIgc3Ryb2tlPSIjMjJkM2VlIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGNpcmNsZSBjeD0iMTAuOCIgY3k9IjE3LjIiIHI9IjIuNiIgZmlsbD0iI2YwYWJmYyIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iMTEuMiIgcj0iMi42IiBmaWxsPSIjZmRlNjhhIi8+PGNpcmNsZSBjeD0iMjEuMiIgY3k9IjE3LjIiIHI9IjIuNiIgZmlsbD0iIzY3ZThmOSIvPjwvc3ZnPg==" x="10" y="7" width="24" height="24"/>
+  <text x="40" y="25" font-size="13" font-weight="600" fill="#e2e8f0">Conduit Studio</text>
+
+  <!-- Nav tabs -->
+  <rect x="140" y="8" width="2" height="24" fill="#1e293b"/>
+  <!-- ML tab (active) -->
+  <rect x="155" y="0" width="68" height="39" fill="#1e293b" rx="0"/>
+  <rect x="155" y="37" width="68" height="2" fill="#6366f1"/>
+  <text x="189" y="25" font-size="11" fill="#a5b4fc" text-anchor="middle" font-weight="500">ML Pipeline</text>
+  <!-- LLM tab -->
+  <text x="255" y="25" font-size="11" fill="#475569" text-anchor="middle">LLM Pipeline</text>
+  <!-- Plugins tab -->
+  <text x="325" y="25" font-size="11" fill="#475569" text-anchor="middle">Plugins</text>
+  <!-- Help tab -->
+  <text x="370" y="25" font-size="11" fill="#475569" text-anchor="middle">Help</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       LEFT PANEL — Node Palette  (width 210)
+  ════════════════════════════════════════════════════════ -->
+  <rect x="0" y="40" width="210" height="700" fill="#0c1427"/>
+  <rect x="209" y="40" width="1" height="700" fill="#1e293b"/>
+
+  <!-- Palette header -->
+  <text x="12" y="60" font-size="10" font-weight="600" fill="#64748b" letter-spacing="0.08em">NODE PALETTE</text>
+
+  <!-- Search bar -->
+  <rect x="10" y="66" width="190" height="24" rx="5" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="22" y="83" font-size="10" fill="#475569">🔍  Search nodes…</text>
+
+  <!-- Category: Ingest -->
+  <rect x="0" y="96" width="210" height="22" fill="#0f1f38"/>
+  <text x="12" y="111" font-size="10" font-weight="700" fill="#38bdf8" letter-spacing="0.06em">▸ DATA INGESTION</text>
+
+  <!-- Palette items -->
+  <rect x="8" y="120" width="194" height="28" rx="5" fill="#1e293b" stroke="#0e7490" stroke-width="0.5"/>
+  <rect x="8" y="120" width="4" height="28" rx="2" fill="#0891b2"/>
+  <text x="20" y="134" font-size="9" font-weight="600" fill="#e2e8f0">CSV Ingest</text>
+  <text x="20" y="143" font-size="8" fill="#64748b">Load CSV/Parquet file</text>
+  <rect x="8" y="152" width="194" height="28" rx="5" fill="#1e293b" stroke="#0e7490" stroke-width="0.5"/>
+  <rect x="8" y="152" width="4" height="28" rx="2" fill="#0891b2"/>
+  <text x="20" y="166" font-size="9" font-weight="600" fill="#e2e8f0">S3 Ingest</text>
+  <text x="20" y="175" font-size="8" fill="#64748b">AWS S3 bucket source</text>
+  <rect x="8" y="184" width="194" height="28" rx="5" fill="#1e293b" stroke="#0e7490" stroke-width="0.5"/>
+  <rect x="8" y="184" width="4" height="28" rx="2" fill="#0891b2"/>
+  <text x="20" y="198" font-size="9" font-weight="600" fill="#e2e8f0">PostgreSQL</text>
+  <text x="20" y="207" font-size="8" fill="#64748b">SQL query → DataFrame</text>
+
+  <!-- Category: Transform -->
+  <rect x="0" y="218" width="210" height="22" fill="#0f1f38"/>
+  <text x="12" y="233" font-size="10" font-weight="700" fill="#c084fc" letter-spacing="0.06em">▸ TRANSFORM</text>
+
+  <rect x="8" y="242" width="194" height="28" rx="5" fill="#1e293b" stroke="#7e22ce" stroke-width="0.5"/>
+  <rect x="8" y="242" width="4" height="28" rx="2" fill="#9333ea"/>
+  <text x="20" y="256" font-size="9" font-weight="600" fill="#e2e8f0">Standard Scaler</text>
+  <text x="20" y="265" font-size="8" fill="#64748b">Normalize feature columns</text>
+  <rect x="8" y="274" width="194" height="28" rx="5" fill="#1e293b" stroke="#7e22ce" stroke-width="0.5"/>
+  <rect x="8" y="274" width="4" height="28" rx="2" fill="#9333ea"/>
+  <text x="20" y="288" font-size="9" font-weight="600" fill="#e2e8f0">Train/Test Split</text>
+  <text x="20" y="297" font-size="8" fill="#64748b">Split dataset by ratio</text>
+
+  <!-- Category: Train -->
+  <rect x="0" y="308" width="210" height="22" fill="#0f1f38"/>
+  <text x="12" y="323" font-size="10" font-weight="700" fill="#fbbf24" letter-spacing="0.06em">▸ TRAIN</text>
+
+  <rect x="8" y="332" width="194" height="28" rx="5" fill="#1e293b" stroke="#b45309" stroke-width="0.5"/>
+  <rect x="8" y="332" width="4" height="28" rx="2" fill="#d97706"/>
+  <text x="20" y="346" font-size="9" font-weight="600" fill="#e2e8f0">Random Forest</text>
+  <text x="20" y="355" font-size="8" fill="#64748b">sklearn RandomForest</text>
+  <rect x="8" y="364" width="194" height="28" rx="5" fill="#1e293b" stroke="#b45309" stroke-width="0.5"/>
+  <rect x="8" y="364" width="4" height="28" rx="2" fill="#d97706"/>
+  <text x="20" y="378" font-size="9" font-weight="600" fill="#e2e8f0">XGBoost</text>
+  <text x="20" y="387" font-size="8" fill="#64748b">Gradient boosted trees</text>
+
+  <!-- Category: Evaluate -->
+  <rect x="0" y="398" width="210" height="22" fill="#0f1f38"/>
+  <text x="12" y="413" font-size="10" font-weight="700" fill="#34d399" letter-spacing="0.06em">▸ EVALUATE</text>
+
+  <rect x="8" y="422" width="194" height="28" rx="5" fill="#1e293b" stroke="#065f46" stroke-width="0.5"/>
+  <rect x="8" y="422" width="4" height="28" rx="2" fill="#059669"/>
+  <text x="20" y="436" font-size="9" font-weight="600" fill="#e2e8f0">Classification Metrics</text>
+  <text x="20" y="445" font-size="8" fill="#64748b">Accuracy, F1, ROC-AUC</text>
+
+  <!-- Category: Deploy -->
+  <rect x="0" y="456" width="210" height="22" fill="#0f1f38"/>
+  <text x="12" y="471" font-size="10" font-weight="700" fill="#fb7185" letter-spacing="0.06em">▸ DEPLOY</text>
+
+  <rect x="8" y="480" width="194" height="28" rx="5" fill="#1e293b" stroke="#9f1239" stroke-width="0.5"/>
+  <rect x="8" y="480" width="4" height="28" rx="2" fill="#e11d48"/>
+  <text x="20" y="494" font-size="9" font-weight="600" fill="#e2e8f0">MLflow Register</text>
+  <text x="20" y="503" font-size="8" fill="#64748b">Log + register model</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       TOOLBAR (between palette and canvas)
+  ════════════════════════════════════════════════════════ -->
+  <rect x="210" y="40" width="860" height="34" fill="#0c1427"/>
+  <rect x="210" y="73" width="860" height="1" fill="#1e293b"/>
+
+  <!-- Run button -->
+  <rect x="220" y="47" width="56" height="20" rx="4" fill="#16a34a"/>
+  <text x="248" y="61" font-size="10" font-weight="600" fill="white" text-anchor="middle">▶ Run</text>
+  <!-- Docker button -->
+  <rect x="282" y="47" width="72" height="20" rx="4" fill="#1e3a5f" stroke="#3b82f6" stroke-width="0.8"/>
+  <text x="318" y="61" font-size="10" fill="#93c5fd" text-anchor="middle">🐳 Docker</text>
+  <!-- Stop button -->
+  <rect x="360" y="47" width="50" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+  <text x="385" y="61" font-size="10" fill="#64748b" text-anchor="middle">⏹ Stop</text>
+  <!-- Validate button -->
+  <rect x="416" y="47" width="66" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+  <text x="449" y="61" font-size="10" fill="#94a3b8" text-anchor="middle">✓ Validate</text>
+
+  <!-- Pipeline name -->
+  <text x="700" y="61" font-size="11" fill="#475569" text-anchor="middle">iris_classification_pipeline</text>
+
+  <!-- Sample pipelines button -->
+  <rect x="930" y="47" width="90" height="20" rx="4" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>
+  <text x="975" y="61" font-size="10" fill="#94a3b8" text-anchor="middle">⚡ Samples</text>
+
+  <!-- Canvas / Code tabs -->
+  <rect x="210" y="74" width="860" height="28" fill="#0c1427"/>
+  <rect x="210" y="101" width="860" height="1" fill="#1e293b"/>
+  <text x="240" y="92" font-size="11" fill="#a5b4fc" font-weight="500">Canvas</text>
+  <rect x="220" y="99" width="40" height="2" fill="#6366f1"/>
+  <text x="300" y="92" font-size="11" fill="#475569">Code</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       CANVAS AREA
+  ════════════════════════════════════════════════════════ -->
+  <rect x="210" y="102" width="860" height="638" fill="#080f1e"/>
+  <rect x="210" y="102" width="860" height="638" fill="url(#dots)"/>
+
+  <!-- ── Pipeline Nodes ────────────────────────────────── -->
+
+  <!-- NODE 1: CSV Ingest (x=260, y=280) -->
+  <g filter="url(#nodeShadow)">
+    <rect x="260" y="270" width="148" height="84" rx="8" fill="#0f1f38" stroke="#0891b2" stroke-width="1.5"/>
+    <rect x="260" y="270" width="148" height="28" rx="8" fill="url(#ingestHdr)"/>
+    <rect x="260" y="284" width="148" height="14" fill="url(#ingestHdr)"/>
+    <text x="275" y="288" font-size="10" font-weight="700" fill="white">CSV Ingest</text>
+    <text x="395" y="288" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="end">ingest</text>
+    <text x="275" y="310" font-size="9" fill="#94a3b8">iris.csv</text>
+    <text x="275" y="323" font-size="8" fill="#64748b">delimiter: comma</text>
+    <!-- Output port (right) -->
+    <circle cx="408" cy="330" r="6" fill="#3b82f6" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="400" y="348" font-size="7" fill="#64748b" text-anchor="middle">DataFrame</text>
+  </g>
+
+  <!-- NODE 2: Standard Scaler (x=460, y=200) -->
+  <g filter="url(#nodeShadow)">
+    <rect x="460" y="190" width="148" height="84" rx="8" fill="#0f1f38" stroke="#9333ea" stroke-width="1.5"/>
+    <rect x="460" y="190" width="148" height="28" rx="8" fill="url(#transformHdr)"/>
+    <rect x="460" y="204" width="148" height="14" fill="url(#transformHdr)"/>
+    <text x="475" y="208" font-size="10" font-weight="700" fill="white">Standard Scaler</text>
+    <text x="595" y="208" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="end">transform</text>
+    <text x="475" y="230" font-size="9" fill="#94a3b8">with_mean: true</text>
+    <text x="475" y="243" font-size="8" fill="#64748b">with_std: true</text>
+    <!-- Input port (left) -->
+    <circle cx="460" cy="250" r="6" fill="#3b82f6" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="460" y="268" font-size="7" fill="#64748b" text-anchor="middle">DataFrame</text>
+    <!-- Output port (right) -->
+    <circle cx="608" cy="250" r="6" fill="#3b82f6" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="608" y="268" font-size="7" fill="#64748b" text-anchor="middle">DataFrame</text>
+  </g>
+
+  <!-- NODE 3: Train/Test Split (x=460, y=355) -->
+  <g filter="url(#nodeShadow)">
+    <rect x="460" y="345" width="148" height="84" rx="8" fill="#0f1f38" stroke="#9333ea" stroke-width="1.5"/>
+    <rect x="460" y="345" width="148" height="28" rx="8" fill="url(#transformHdr)"/>
+    <rect x="460" y="359" width="148" height="14" fill="url(#transformHdr)"/>
+    <text x="475" y="363" font-size="10" font-weight="700" fill="white">Train/Test Split</text>
+    <text x="595" y="363" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="end">transform</text>
+    <text x="475" y="385" font-size="9" fill="#94a3b8">test_size: 0.2</text>
+    <text x="475" y="398" font-size="8" fill="#64748b">random_state: 42</text>
+    <!-- Input port (left) -->
+    <circle cx="460" cy="405" r="6" fill="#3b82f6" stroke="#1e293b" stroke-width="1.5"/>
+    <!-- Output port (right) -->
+    <circle cx="608" cy="405" r="6" fill="#3b82f6" stroke="#1e293b" stroke-width="1.5"/>
+  </g>
+
+  <!-- NODE 4: Random Forest (x=670, y=280) selected -->
+  <g filter="url(#nodeShadow)">
+    <rect x="666" y="266" width="156" height="92" rx="8" fill="#1c1035" stroke="#6366f1" stroke-width="2"/>
+    <!-- selection glow ring -->
+    <rect x="662" y="262" width="164" height="100" rx="10" fill="none" stroke="#6366f1" stroke-width="1" opacity="0.4"/>
+    <rect x="670" y="270" width="148" height="28" rx="8" fill="url(#trainHdr)"/>
+    <rect x="670" y="284" width="148" height="14" fill="url(#trainHdr)"/>
+    <text x="685" y="288" font-size="10" font-weight="700" fill="white">Random Forest</text>
+    <text x="805" y="288" font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="end">train</text>
+    <text x="685" y="310" font-size="9" fill="#94a3b8">n_estimators: 100</text>
+    <text x="685" y="323" font-size="8" fill="#64748b">max_depth: 10</text>
+    <!-- running status badge -->
+    <rect x="750" y="304" width="52" height="14" rx="4" fill="#14532d"/>
+    <circle cx="758" cy="311" r="3" fill="#4ade80"/>
+    <text x="770" y="315" font-size="7" fill="#4ade80">success</text>
+    <!-- Input port (left) -->
+    <circle cx="670" cy="332" r="6" fill="#3b82f6" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="670" y="350" font-size="7" fill="#64748b" text-anchor="middle">DataFrame</text>
+    <!-- Output port (right) -->
+    <circle cx="818" cy="332" r="6" fill="#a855f7" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="818" y="350" font-size="7" fill="#64748b" text-anchor="middle">Model</text>
+  </g>
+
+  <!-- NODE 5: Classification Metrics (x=880, y=200) -->
+  <g filter="url(#nodeShadow)">
+    <rect x="880" y="190" width="148" height="84" rx="8" fill="#0f1f38" stroke="#059669" stroke-width="1.5"/>
+    <rect x="880" y="190" width="148" height="28" rx="8" fill="url(#evalHdr)"/>
+    <rect x="880" y="204" width="148" height="14" fill="url(#evalHdr)"/>
+    <text x="895" y="208" font-size="10" font-weight="700" fill="white">Classification Metrics</text>
+    <text x="895" y="230" font-size="9" fill="#94a3b8">Accuracy: 0.9733</text>
+    <text x="895" y="243" font-size="8" fill="#64748b">F1: 0.971 · AUC: 0.998</text>
+    <!-- Input port model (left top) -->
+    <circle cx="880" cy="230" r="6" fill="#a855f7" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="880" y="248" font-size="7" fill="#64748b" text-anchor="middle">Model</text>
+    <!-- Output port metrics (right) -->
+    <circle cx="1028" cy="230" r="6" fill="#f97316" stroke="#1e293b" stroke-width="1.5"/>
+  </g>
+
+  <!-- NODE 6: MLflow Register (x=880, y=355) -->
+  <g filter="url(#nodeShadow)">
+    <rect x="880" y="345" width="148" height="84" rx="8" fill="#0f1f38" stroke="#e11d48" stroke-width="1.5"/>
+    <rect x="880" y="345" width="148" height="28" rx="8" fill="url(#deployHdr)"/>
+    <rect x="880" y="359" width="148" height="14" fill="url(#deployHdr)"/>
+    <text x="895" y="363" font-size="10" font-weight="700" fill="white">MLflow Register</text>
+    <text x="895" y="385" font-size="9" fill="#94a3b8">experiment: iris_clf</text>
+    <text x="895" y="398" font-size="8" fill="#64748b">autolog: true</text>
+    <!-- Input port model (left) -->
+    <circle cx="880" cy="405" r="6" fill="#a855f7" stroke="#1e293b" stroke-width="1.5"/>
+    <text x="880" y="423" font-size="7" fill="#64748b" text-anchor="middle">Model</text>
+  </g>
+
+  <!-- ── Edges / Connections ──────────────────────────── -->
+  <!-- CSV Ingest → Standard Scaler (DataFrame, blue) -->
+  <path d="M 414 330 C 437 330, 437 250, 460 250" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6 3" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- CSV Ingest → Train/Test Split (DataFrame, blue) -->
+  <path d="M 414 330 C 437 330, 437 405, 460 405" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6 3" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Standard Scaler → Random Forest (DataFrame, blue) -->
+  <path d="M 608 250 C 639 250, 639 332, 670 332" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6 3" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Train/Test Split → Random Forest (DataFrame, blue) -->
+  <path d="M 608 405 C 639 405, 639 332, 670 332" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6 3" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Random Forest → Classification Metrics (Model, purple) -->
+  <path d="M 818 332 C 849 332, 849 230, 880 230" fill="none" stroke="#a855f7" stroke-width="2" stroke-dasharray="6 3" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Random Forest → MLflow Register (Model, purple) -->
+  <path d="M 818 332 C 849 332, 849 405, 880 405" fill="none" stroke="#a855f7" stroke-width="2" stroke-dasharray="6 3" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- ── Context menu popup (showing on Random Forest) ── -->
+  <rect x="826" y="310" width="130" height="72" rx="7" fill="#1e293b" stroke="rgba(99,102,241,0.4)" stroke-width="1" filter="url(#nodeShadow)"/>
+  <rect x="833" y="320" width="116" height="20" rx="4" fill="rgba(255,255,255,0.06)"/>
+  <text x="841" y="334" font-size="10" fill="#e2e8f0">⚙  Properties</text>
+  <rect x="833" y="343" width="116" height="1" fill="rgba(255,255,255,0.08)"/>
+  <rect x="833" y="349" width="116" height="20" rx="4" fill="transparent"/>
+  <text x="841" y="363" font-size="10" fill="#f87171">🗑  Delete Node</text>
+  <!-- Arrow pointing to node -->
+  <polygon points="818,332 826,326 826,338" fill="#1e293b" stroke="rgba(99,102,241,0.4)" stroke-width="1"/>
+
+  <!-- ── Mini map ──────────────────────────────────────── -->
+  <rect x="940" y="620" width="112" height="72" rx="5" fill="#0c1427" stroke="#1e293b" stroke-width="1" opacity="0.95"/>
+  <text x="946" y="632" font-size="7" fill="#475569">MINIMAP</text>
+  <!-- Mini nodes -->
+  <rect x="950" y="636" width="18" height="10" rx="2" fill="#0891b2" opacity="0.6"/>
+  <rect x="975" y="632" width="16" height="10" rx="2" fill="#9333ea" opacity="0.6"/>
+  <rect x="975" y="646" width="16" height="10" rx="2" fill="#9333ea" opacity="0.6"/>
+  <rect x="1000" y="636" width="20" height="10" rx="2" fill="#d97706" opacity="0.7"/>
+  <rect x="1025" y="632" width="18" height="10" rx="2" fill="#059669" opacity="0.6"/>
+  <rect x="1025" y="646" width="18" height="10" rx="2" fill="#e11d48" opacity="0.6"/>
+  <!-- Mini edges -->
+  <line x1="968" y1="641" x2="975" y2="637" stroke="#3b82f6" stroke-width="0.8" opacity="0.6"/>
+  <line x1="968" y1="641" x2="975" y2="651" stroke="#3b82f6" stroke-width="0.8" opacity="0.6"/>
+  <line x1="991" y1="637" x2="1000" y2="641" stroke="#3b82f6" stroke-width="0.8" opacity="0.6"/>
+  <line x1="991" y1="651" x2="1000" y2="641" stroke="#3b82f6" stroke-width="0.8" opacity="0.6"/>
+  <line x1="1020" y1="641" x2="1025" y2="637" stroke="#a855f7" stroke-width="0.8" opacity="0.6"/>
+  <line x1="1020" y1="641" x2="1025" y2="651" stroke="#a855f7" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- Controls -->
+  <rect x="216" y="620" width="24" height="24" rx="4" fill="#0c1427" stroke="#1e293b" stroke-width="1"/>
+  <text x="228" y="635" font-size="12" fill="#64748b" text-anchor="middle">+</text>
+  <rect x="216" y="648" width="24" height="24" rx="4" fill="#0c1427" stroke="#1e293b" stroke-width="1"/>
+  <text x="228" y="663" font-size="12" fill="#64748b" text-anchor="middle">−</text>
+  <rect x="216" y="676" width="24" height="24" rx="4" fill="#0c1427" stroke="#1e293b" stroke-width="1"/>
+  <text x="228" y="691" font-size="10" fill="#64748b" text-anchor="middle">⊡</text>
+
+  <!-- ── AI Assistant floating button ─────────────────── -->
+  <rect x="946" y="574" width="86" height="28" rx="14" fill="#1e293b" stroke="rgba(168,85,247,0.5)" stroke-width="1"/>
+  <text x="960" y="593" font-size="11">🤖</text>
+  <text x="975" y="593" font-size="10" fill="#c084fc" font-weight="500">Assistant</text>
+
+  <!-- ── Log panel at bottom ──────────────────────────── -->
+  <rect x="210" y="650" width="860" height="90" fill="#0a0f1e" stroke-top="#1e293b"/>
+  <rect x="210" y="650" width="860" height="1" fill="#1e293b"/>
+  <!-- Log header -->
+  <rect x="210" y="650" width="860" height="22" fill="#0c1427"/>
+  <text x="222" y="665" font-size="10" fill="#475569">⌨  Pipeline Logs</text>
+  <text x="290" y="665" font-size="9" fill="#374151">run:a3f2c1d4</text>
+  <rect x="960" y="654" width="50" height="14" rx="3" fill="#1e3a5f"/>
+  <circle cx="968" cy="661" r="3" fill="#4ade80"/>
+  <text x="975" y="665" font-size="8" fill="#4ade80">running</text>
+  <!-- Log lines -->
+  <text x="222" y="687" font-size="9" fill="#94a3b8" font-family="monospace">▶ Pipeline RUNNING</text>
+  <text x="222" y="700" font-size="9" fill="#6ee7b7" font-family="monospace">✓ [Standard Scaler]  success  — 0.02s</text>
+  <text x="222" y="713" font-size="9" fill="#6ee7b7" font-family="monospace">✓ [Train/Test Split] success  — 0.01s</text>
+  <text x="222" y="726" font-size="9" fill="#93c5fd" font-family="monospace">▶ [Random Forest]    running…</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       RIGHT PANEL — Inspector  (width 210)
+  ════════════════════════════════════════════════════════ -->
+  <rect x="1070" y="40" width="210" height="700" fill="#0c1427"/>
+  <rect x="1070" y="40" width="1" height="700" fill="#1e293b"/>
+
+  <!-- Inspector header badge -->
+  <rect x="1080" y="52" width="190" height="26" rx="6" fill="url(#inspectorBadge)" opacity="0.9"/>
+  <text x="1175" y="69" font-size="11" font-weight="700" fill="white" text-anchor="middle">Random Forest</text>
+
+  <text x="1080" y="97" font-size="9" font-weight="600" fill="#64748b" letter-spacing="0.07em">NODE CONFIG</text>
+
+  <!-- Config fields -->
+  <!-- n_estimators -->
+  <text x="1080" y="116" font-size="9" fill="#94a3b8">n_estimators</text>
+  <rect x="1080" y="120" width="190" height="24" rx="4" fill="#1e293b" stroke="#6366f1" stroke-width="1"/>
+  <text x="1093" y="136" font-size="10" fill="#e2e8f0">100</text>
+
+  <!-- max_depth -->
+  <text x="1080" y="155" font-size="9" fill="#94a3b8">max_depth</text>
+  <rect x="1080" y="159" width="190" height="24" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="1093" y="175" font-size="10" fill="#e2e8f0">10</text>
+
+  <!-- criterion -->
+  <text x="1080" y="194" font-size="9" fill="#94a3b8">criterion</text>
+  <rect x="1080" y="198" width="190" height="24" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="1093" y="214" font-size="10" fill="#e2e8f0">gini</text>
+  <text x="1258" y="214" font-size="8" fill="#475569" text-anchor="end">▾</text>
+
+  <!-- random_state -->
+  <text x="1080" y="233" font-size="9" fill="#94a3b8">random_state</text>
+  <rect x="1080" y="237" width="190" height="24" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="1093" y="253" font-size="10" fill="#e2e8f0">42</text>
+
+  <!-- mlflow_tracking toggle -->
+  <text x="1080" y="275" font-size="9" fill="#94a3b8">mlflow_tracking</text>
+  <rect x="1230" y="263" width="36" height="18" rx="9" fill="#6366f1"/>
+  <circle cx="1256" cy="272" r="7" fill="white"/>
+
+  <!-- Divider -->
+  <rect x="1080" y="292" width="190" height="1" fill="#1e293b"/>
+  <text x="1080" y="308" font-size="9" font-weight="600" fill="#64748b" letter-spacing="0.07em">PORT TYPES</text>
+
+  <!-- Input port row -->
+  <text x="1080" y="325" font-size="9" fill="#64748b">INPUT</text>
+  <rect x="1080" y="330" width="190" height="22" rx="4" fill="#1e293b"/>
+  <circle cx="1093" cy="341" r="5" fill="#3b82f6"/>
+  <text x="1103" y="345" font-size="9" fill="#94a3b8">data_in</text>
+  <rect x="1210" y="334" width="52" height="14" rx="4" fill="#1e3a5f"/>
+  <text x="1236" y="344" font-size="8" fill="#93c5fd" text-anchor="middle">DataFrame</text>
+
+  <!-- Output port row -->
+  <text x="1080" y="365" font-size="9" fill="#64748b">OUTPUT</text>
+  <rect x="1080" y="370" width="190" height="22" rx="4" fill="#1e293b"/>
+  <circle cx="1093" cy="381" r="5" fill="#a855f7"/>
+  <text x="1103" y="385" font-size="9" fill="#94a3b8">model_out</text>
+  <rect x="1216" y="374" width="46" height="14" rx="4" fill="#2e1065"/>
+  <text x="1239" y="384" font-size="8" fill="#c084fc" text-anchor="middle">Model</text>
+
+  <!-- Divider -->
+  <rect x="1080" y="402" width="190" height="1" fill="#1e293b"/>
+  <text x="1080" y="418" font-size="9" font-weight="600" fill="#64748b" letter-spacing="0.07em">LAST RUN</text>
+  <rect x="1080" y="422" width="190" height="52" rx="5" fill="#0a1628"/>
+  <text x="1093" y="438" font-size="9" fill="#4ade80">✓ success</text>
+  <text x="1093" y="453" font-size="8" fill="#64748b">Duration: 1.24s</text>
+  <text x="1093" y="466" font-size="8" fill="#64748b">Accuracy: 0.9733</text>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BRANDING WATERMARK
+  ════════════════════════════════════════════════════════ -->
+  <text x="640" y="730" font-size="9" fill="#1e293b" text-anchor="middle" letter-spacing="0.1em">CONDUIT STUDIO — VISUAL MLOPS IDE</text>
+</svg>

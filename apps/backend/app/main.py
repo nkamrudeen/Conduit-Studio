@@ -11,7 +11,14 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",
+        # Electron renderer — pages loaded from file:// send Origin: null
+        "null",
+    ],
+    allow_origin_regex=r"app://.*",  # Electron custom protocol (electron-forge etc.)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

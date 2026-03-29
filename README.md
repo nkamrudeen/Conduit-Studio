@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="apps/web/public/screenshot.svg" width="960" alt="Conduit Studio — IDE screenshot" />
+  <img src="docs/demo.gif" width="960" alt="Conduit Studio — live demo" />
 </p>
 
 ---

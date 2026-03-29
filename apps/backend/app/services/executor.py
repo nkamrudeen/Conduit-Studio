@@ -213,8 +213,13 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
                     f"{indented}\n"
                     f'    print("__AIIDE_NODE_END:{nid}:success__", flush=True)\n'
                     f"except Exception as _aiide_exc:\n"
-                    f'    print(f"__AIIDE_NODE_END:{nid}:error__", flush=True)\n'
-                    f"    raise\n"
+                    f'    import traceback as _aiide_tb\n'
+                    f'    print("__AIIDE_NODE_END:{nid}:error__", flush=True)\n'
+                    f'    print(f"[{nid}] error: {{_aiide_exc}}", flush=True)\n'
+                    f'    _aiide_tb.print_exc()\n'
+                    # Do NOT re-raise — let independent parallel branches continue running.
+                    # Downstream nodes that depend on this node's output will fail naturally
+                    # with a NameError, which will be caught by their own try/except.
                 )
 
             code, _ = python_gen.assemble(dag_obj, wrapped, packages)

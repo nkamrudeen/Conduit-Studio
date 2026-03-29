@@ -3,39 +3,44 @@
 try:
     from evidently.report import Report
     from evidently.metric_preset import DataDriftPreset
-except ImportError as _e:
-    raise ImportError(
-        "evidently>=0.4.0 is required. Run: pip install 'evidently>=0.4.0,<0.5.0'"
-    ) from _e
+    _evidently_available_{{ node_id }} = True
+except ImportError:
+    print(
+        "[Drift Monitor] WARNING: evidently is not installed — skipping drift report. "
+        "Install it with: pip install 'evidently>=0.4.0,<0.5.0'"
+    )
+    _evidently_available_{{ node_id }} = False
 
-# Expects two DataFrame inputs: 'df_reference' (baseline) and 'df_current' (new data).
-# If only one input is connected, it is used as current data and split for reference.
-{% set ref_v = inputs['df_reference'] if 'df_reference' in inputs else None %}
-{% set cur_v = inputs['df_current'] if 'df_current' in inputs else input_var %}
+if _evidently_available_{{ node_id }}:
+    # Expects two DataFrame inputs: 'df_reference' (baseline) and 'df_current' (new data).
+    # If only one input is connected, it is used as current data and split for reference.
+    {% set ref_v = inputs['df_reference'] if 'df_reference' in inputs else None %}
+    {% set cur_v = inputs['df_current'] if 'df_current' in inputs else input_var %}
 
-{% if ref_v %}
-_ref_{{ node_id }} = {{ ref_v }}
-_cur_{{ node_id }} = {{ cur_v }}
-{% else %}
-# Single input: use first half as reference, second half as current
-_half_{{ node_id }} = len({{ cur_v }}) // 2
-_ref_{{ node_id }} = {{ cur_v }}.iloc[:_half_{{ node_id }}].reset_index(drop=True)
-_cur_{{ node_id }} = {{ cur_v }}.iloc[_half_{{ node_id }}:].reset_index(drop=True)
-{% endif %}
+    {% if ref_v %}
+    _ref_{{ node_id }} = {{ ref_v }}
+    _cur_{{ node_id }} = {{ cur_v }}
+    {% else %}
+    # Single input: use first half as reference, second half as current
+    _half_{{ node_id }} = len({{ cur_v }}) // 2
+    _ref_{{ node_id }} = {{ cur_v }}.iloc[:_half_{{ node_id }}].reset_index(drop=True)
+    _cur_{{ node_id }} = {{ cur_v }}.iloc[_half_{{ node_id }}:].reset_index(drop=True)
+    {% endif %}
 
-{% if config.columns %}
-_ref_{{ node_id }} = _ref_{{ node_id }}[{{ config.columns | tojson }}]
-_cur_{{ node_id }} = _cur_{{ node_id }}[{{ config.columns | tojson }}]
-{% endif %}
+    {% if config.columns %}
+    _ref_{{ node_id }} = _ref_{{ node_id }}[{{ config.columns | tojson }}]
+    _cur_{{ node_id }} = _cur_{{ node_id }}[{{ config.columns | tojson }}]
+    {% endif %}
 
-_report_{{ node_id }} = Report(metrics=[
-    DataDriftPreset(drift_share={{ config.drift_share_threshold | default(0.15) }}),
-])
-_report_{{ node_id }}.run(reference_data=_ref_{{ node_id }}, current_data=_cur_{{ node_id }})
-_report_{{ node_id }}.save_html("{{ config.report_path | default('drift_report.html') }}")
-print(f"[Drift Monitor] Report saved to {{ config.report_path | default('drift_report.html') }}")
-
-_drift_result_{{ node_id }} = _report_{{ node_id }}.as_dict()
-metrics_{{ node_id }} = {
-    "dataset_drift": _drift_result_{{ node_id }}.get("metrics", [{}])[0].get("result", {}).get("dataset_drift", False)
-}
+    _report_{{ node_id }} = Report(metrics=[
+        DataDriftPreset(drift_share={{ config.drift_share_threshold | default(0.15) }}),
+    ])
+    _report_{{ node_id }}.run(reference_data=_ref_{{ node_id }}, current_data=_cur_{{ node_id }})
+    _report_{{ node_id }}.save_html("{{ config.report_path | default('drift_report.html') }}")
+    print(f"[Drift Monitor] Report saved to {{ config.report_path | default('drift_report.html') }}")
+    _drift_result_{{ node_id }} = _report_{{ node_id }}.as_dict()
+    metrics_{{ node_id }} = {
+        "dataset_drift": _drift_result_{{ node_id }}.get("metrics", [{}])[0].get("result", {}).get("dataset_drift", False)
+    }
+else:
+    metrics_{{ node_id }} = {"dataset_drift": None}

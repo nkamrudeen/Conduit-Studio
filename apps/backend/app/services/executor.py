@@ -143,14 +143,58 @@ def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = No
     return [sys.executable, "-m", "pip", "install"] + flags + packages
 
 
-def _rewrite_localhost_for_docker(dag: dict[str, Any]) -> dict[str, Any]:
-    """Replace ``localhost`` / ``127.0.0.1`` in node config string values with
-    ``host.docker.internal`` so that services running on the host (MLflow,
-    databases, etc.) are reachable from inside the Docker container.
+def _get_docker_host_ip() -> str:
+    """Return the IP address containers should use to reach the host.
 
-    On Linux Docker the ``--add-host=host.docker.internal:host-gateway`` flag
-    must also be passed to ``docker run`` (see the executor below).
-    Mac/Windows Docker Desktop already resolves ``host.docker.internal`` natively.
+    MLflow (and many other servers) perform DNS-rebinding protection by
+    rejecting requests whose ``Host`` header is a hostname rather than an
+    IP address.  Using ``host.docker.internal`` triggers this check because
+    the HTTP client sends ``Host: host.docker.internal`` which the server
+    rejects with 403.  Using the actual IP sidesteps the check entirely.
+
+    Strategy (in priority order):
+    1. Ask Docker for the bridge-network gateway (authoritative on Linux).
+    2. Resolve ``host.docker.internal`` from the *host* side (Docker Desktop).
+    3. Fall back to the conventional Linux bridge default ``172.17.0.1``.
+    """
+    # 1. Docker bridge gateway — works on Linux Docker Engine
+    try:
+        result = subprocess.run(
+            [
+                shutil.which("docker") or "docker",
+                "network", "inspect", "bridge",
+                "--format", "{{range .IPAM.Config}}{{.Gateway}}{{end}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        ip = result.stdout.strip()
+        if ip:
+            return ip
+    except Exception:
+        pass
+
+    # 2. Resolve host.docker.internal on the host (Docker Desktop Mac/Windows)
+    try:
+        import socket
+        ip = socket.gethostbyname("host.docker.internal")
+        if ip:
+            return ip
+    except Exception:
+        pass
+
+    # 3. Conventional Docker bridge gateway fallback
+    return "172.17.0.1"
+
+
+def _rewrite_localhost_for_docker(dag: dict[str, Any], host_ip: str) -> dict[str, Any]:
+    """Replace ``localhost`` / ``127.0.0.1`` in node config string values with
+    *host_ip* so that services running on the host (MLflow, databases, etc.)
+    are reachable from inside the Docker container using the IP address.
+
+    Using an IP rather than a hostname avoids MLflow's DNS-rebinding
+    protection, which rejects requests with a non-IP ``Host`` header.
     """
     import copy as _copy
     dag_copy = _copy.deepcopy(dag)
@@ -160,8 +204,8 @@ def _rewrite_localhost_for_docker(dag: dict[str, Any]) -> dict[str, Any]:
             if isinstance(val, str):
                 cfg[key] = (
                     val
-                    .replace("localhost", "host.docker.internal")
-                    .replace("127.0.0.1", "host.docker.internal")
+                    .replace("localhost", host_ip)
+                    .replace("127.0.0.1", host_ip)
                 )
     return dag_copy
 
@@ -346,10 +390,12 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
 
         # Rewrite absolute file_path values to bare filenames; copies the
         # source files into tmp_dir so they end up in the Docker build context.
-        # Also rewrite localhost URIs → host.docker.internal so the container
-        # can reach host-side services (MLflow, databases, etc.).
+        # Rewrite localhost → host IP so the container can reach host services.
+        # Using the IP (not hostname) avoids MLflow's DNS-rebinding Host check.
+        _host_ip = _get_docker_host_ip()
+        await queue.put({"type": "log", "text": f"[Docker] Host gateway IP: {_host_ip} (localhost URIs rewritten)", "stream": "stdout"})
         dag_for_docker = _prepare_dag_for_docker(dag, tmp_dir)
-        dag_for_docker = _rewrite_localhost_for_docker(dag_for_docker)
+        dag_for_docker = _rewrite_localhost_for_docker(dag_for_docker, _host_ip)
         dag_obj = PipelineDAG(**dag_for_docker)
 
         # ── 1. Generate code artefacts ────────────────────────────────────
@@ -424,14 +470,7 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
         run_rc = await _stream_subprocess(
-            [
-                docker_exe, "run", "--rm",
-                # Allow the container to reach host-side services (MLflow, DBs, etc.)
-                # via host.docker.internal. On Linux this flag creates the mapping;
-                # Docker Desktop on Mac/Windows provides it natively.
-                "--add-host=host.docker.internal:host-gateway",
-                image_tag,
-            ],
+            [docker_exe, "run", "--rm", image_tag],
             _on_run_line,
         )
 
@@ -613,8 +652,10 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
     try:
         # Create build context dir early — needed for file path rewriting.
         tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
+        _host_ip = _get_docker_host_ip()
+        await queue.put({"type": "log", "text": f"[Docker] Host gateway IP: {_host_ip} (localhost URIs rewritten)", "stream": "stdout"})
         dag_for_docker = _prepare_dag_for_docker(dag, tmp_dir)
-        dag_for_docker = _rewrite_localhost_for_docker(dag_for_docker)
+        dag_for_docker = _rewrite_localhost_for_docker(dag_for_docker, _host_ip)
         dag_obj = PipelineDAG(**dag_for_docker)
 
         # ── 1. Generate code artefacts ────────────────────────────────────
@@ -704,14 +745,7 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
         run_rc = await _stream_subprocess(
-            [
-                docker_exe, "run", "--rm",
-                # Allow the container to reach host-side services (MLflow, DBs, etc.)
-                # via host.docker.internal. On Linux this flag creates the mapping;
-                # Docker Desktop on Mac/Windows provides it natively.
-                "--add-host=host.docker.internal:host-gateway",
-                image_tag,
-            ],
+            [docker_exe, "run", "--rm", image_tag],
             _on_run_line,
         )
 

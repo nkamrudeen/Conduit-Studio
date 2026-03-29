@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
-import { CheckCircle2, XCircle, Loader2, Table } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X } from 'lucide-react'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -274,6 +274,11 @@ function FormField({ fieldKey, schema, required, value, onChange }: FormFieldPro
     )
   }
 
+  // file_path fields get a dedicated upload widget
+  if (fieldKey === 'file_path') {
+    return <FilePathField label={label} value={String(value ?? '')} onChange={onChange} />
+  }
+
   const isLong = (schema.description?.length ?? 0) > 40 || fieldKey.includes('prompt') || fieldKey.includes('query')
   return (
     <div>
@@ -295,6 +300,103 @@ function FormField({ fieldKey, schema, required, value, onChange }: FormFieldPro
           onChange={(e) => onChange(e.target.value)}
         />
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// FilePathField — file upload widget for file_path config properties
+// ---------------------------------------------------------------------------
+
+interface FilePathFieldProps {
+  label: string
+  value: string
+  onChange: (v: string) => void
+}
+
+function FilePathField({ label, value, onChange }: FilePathFieldProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadedName, setUploadedName] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // If the value already looks like an uploaded server path, show the filename.
+  const displayName = uploadedName ?? (value ? value.split(/[\\/]/).pop() ?? value : null)
+
+  const handleUpload = async (file: File) => {
+    setUploading(true)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/files/upload', { method: 'POST', body: form })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json() as { server_path: string; filename: string }
+      onChange(data.server_path)
+      setUploadedName(data.filename)
+    } catch (e) {
+      setError(`Upload failed: ${String(e)}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const clearUpload = () => {
+    onChange('')
+    setUploadedName(null)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  return (
+    <div>
+      <label className="mb-0.5 block text-[11px] font-medium">{label}</label>
+
+      {/* Uploaded file badge */}
+      {uploadedName && (
+        <div className="mb-1.5 flex items-center gap-1.5 rounded-md border border-green-500/40 bg-green-500/10 px-2 py-1">
+          <FileCheck size={11} className="shrink-0 text-green-400" />
+          <span className="flex-1 truncate text-[10px] text-green-300">{uploadedName}</span>
+          <button onClick={clearUpload} className="text-muted-foreground hover:text-foreground">
+            <X size={10} />
+          </button>
+        </div>
+      )}
+
+      {/* Manual path input */}
+      <div className="flex gap-1">
+        <input
+          type="text"
+          className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          value={value}
+          placeholder="Path or upload a file →"
+          onChange={(e) => { onChange(e.target.value); setUploadedName(null) }}
+        />
+        <button
+          title="Upload a local file"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.parquet,.tsv,.json,.jsonl,.xlsx,.xls"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) handleUpload(f)
+            e.target.value = ''
+          }}
+        />
+      </div>
+
+      {error && <p className="mt-0.5 text-[10px] text-destructive">{error}</p>}
+      <p className="mt-0.5 text-[10px] text-muted-foreground">
+        Uploaded files are stored server-side and auto-bundled in Docker builds.
+      </p>
     </div>
   )
 }

@@ -14,7 +14,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY pipeline.py .
+# Copy pipeline script and any local data files (CSV, Parquet, etc.)
+COPY . .
 
 CMD ["python", "pipeline.py"]
 '''

@@ -142,6 +142,34 @@ def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = No
     return [sys.executable, "-m", "pip", "install"] + flags + packages
 
 
+def _prepare_dag_for_docker(dag: dict[str, Any], build_dir: str) -> dict[str, Any]:
+    """Copy any absolute local file paths referenced by nodes into *build_dir*
+    and rewrite those paths to bare filenames so the generated script uses
+    relative paths inside the Docker container.
+
+    The Docker build context already gets ``COPY . .``, so any file placed in
+    *build_dir* is available at the container's ``/app/<filename>`` workdir.
+
+    Returns a shallow-copy of *dag* with rewritten node configs — the original
+    dict is not mutated.
+    """
+    import copy as _copy
+    dag_copy = _copy.deepcopy(dag)
+    for node in dag_copy.get("nodes", []):
+        cfg = node.get("config", {})
+        file_path = cfg.get("file_path", "")
+        if not file_path:
+            continue
+        src = Path(file_path)
+        if src.is_absolute() and src.is_file():
+            dest = Path(build_dir) / src.name
+            # Avoid overwriting if two nodes reference the same filename.
+            if not dest.exists():
+                shutil.copy2(src, dest)
+            cfg["file_path"] = src.name   # rewrite to bare filename
+    return dag_copy
+
+
 async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
     """Run the pipeline described by *dag* and stream output to a queue.
 
@@ -283,7 +311,14 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
     image_tag = f"aiide-pipeline-{run_id[:8]}"
 
     try:
-        dag_obj = PipelineDAG(**dag)
+        # Create build context dir early — _prepare_dag_for_docker needs it
+        # to copy local data files before code generation rewrites the paths.
+        tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
+
+        # Rewrite absolute file_path values to bare filenames; copies the
+        # source files into tmp_dir so they end up in the Docker build context.
+        dag_for_docker = _prepare_dag_for_docker(dag, tmp_dir)
+        dag_obj = PipelineDAG(**dag_for_docker)
 
         # ── 1. Generate code artefacts ────────────────────────────────────
         try:
@@ -300,7 +335,6 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
             return
 
         # ── 2. Write artefacts to temp directory ──────────────────────────
-        tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
         with open(os.path.join(tmp_dir, "pipeline.py"), "w", encoding="utf-8") as f:
             f.write(pipeline_code)
         with open(os.path.join(tmp_dir, "requirements.txt"), "w", encoding="utf-8") as f:
@@ -538,7 +572,10 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
     image_tag = f"aiide-pipeline-{run_id[:8]}"
 
     try:
-        dag_obj = PipelineDAG(**dag)
+        # Create build context dir early — needed for file path rewriting.
+        tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
+        dag_for_docker = _prepare_dag_for_docker(dag, tmp_dir)
+        dag_obj = PipelineDAG(**dag_for_docker)
 
         # ── 1. Generate code artefacts ────────────────────────────────────
         try:
@@ -555,7 +592,6 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
             return
 
         # ── 2. Write artefacts to temp directory ──────────────────────────
-        tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
         with open(os.path.join(tmp_dir, "pipeline.py"), "w", encoding="utf-8") as f:
             f.write(pipeline_code)
         with open(os.path.join(tmp_dir, "requirements.txt"), "w", encoding="utf-8") as f:

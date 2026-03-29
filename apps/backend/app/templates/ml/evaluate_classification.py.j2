@@ -1,6 +1,8 @@
 # ── Classification Evaluation ─────────────────────────────────────────────────
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 {% if config.plot_confusion_matrix %}
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend — prevents GUI hang in subprocess
 import matplotlib.pyplot as plt
 import seaborn as sns
 {% endif %}

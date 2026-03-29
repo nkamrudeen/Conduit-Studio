@@ -29,7 +29,7 @@ _cur_{{ node_id }} = _cur_{{ node_id }}[{{ config.columns | tojson }}]
 {% endif %}
 
 _report_{{ node_id }} = Report(metrics=[
-    DataDriftPreset(drift_share_threshold={{ config.drift_share_threshold | default(0.15) }}),
+    DataDriftPreset(drift_share={{ config.drift_share_threshold | default(0.15) }}),
 ])
 _report_{{ node_id }}.run(reference_data=_ref_{{ node_id }}, current_data=_cur_{{ node_id }})
 _report_{{ node_id }}.save_html("{{ config.report_path | default('drift_report.html') }}")

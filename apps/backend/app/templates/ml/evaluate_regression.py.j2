@@ -2,6 +2,8 @@
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 {% if config.plot_residuals %}
+import matplotlib
+matplotlib.use('Agg')  # non-interactive backend — prevents GUI hang in subprocess
 import matplotlib.pyplot as plt
 {% endif %}
 

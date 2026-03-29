@@ -70,8 +70,8 @@ _NODE_META: dict[str, dict] = {
     "ml.deploy.fastapi": {"template": "ml/deploy_fastapi.py.j2", "packages": ["fastapi", "uvicorn", "joblib"]},
     "ml.deploy.huggingface_hub": {"template": "ml/deploy_huggingface_hub.py.j2", "packages": ["huggingface_hub"]},
     # ML Monitor
-    "ml.monitor.evidently_drift": {"template": "ml/monitor_evidently_drift.py.j2", "packages": ["evidently"]},
-    "ml.monitor.model_performance": {"template": "ml/monitor_model_performance.py.j2", "packages": ["scikit-learn", "evidently"]},
+    "ml.monitor.evidently_drift": {"template": "ml/monitor_evidently_drift.py.j2", "packages": ["evidently>=0.4.0,<0.5.0"]},
+    "ml.monitor.model_performance": {"template": "ml/monitor_model_performance.py.j2", "packages": ["scikit-learn", "evidently>=0.4.0,<0.5.0"]},
     # ML MLflow Experiment Tracking
     "ml.mlflow.set_experiment": {"template": "ml/mlflow_set_experiment.py.j2", "packages": ["mlflow"]},
     "ml.mlflow.autolog": {"template": "ml/mlflow_autolog.py.j2", "packages": ["mlflow"]},

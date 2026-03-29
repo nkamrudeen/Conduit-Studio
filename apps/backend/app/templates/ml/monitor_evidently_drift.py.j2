@@ -1,6 +1,12 @@
 # ── Evidently Data Drift Report ───────────────────────────────────────────────
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+# evidently.report / evidently.metric_preset were introduced in 0.4.x
+try:
+    from evidently.report import Report
+    from evidently.metric_preset import DataDriftPreset
+except ImportError as _e:
+    raise ImportError(
+        "evidently>=0.4.0 is required. Run: pip install 'evidently>=0.4.0,<0.5.0'"
+    ) from _e
 
 # Expects two DataFrame inputs: 'df_reference' (baseline) and 'df_current' (new data).
 # If only one input is connected, it is used as current data and split for reference.

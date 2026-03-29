@@ -155,13 +155,6 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
                   <Package size={11} className="text-green-400" />
                   <span>Run (install deps)</span>
                 </button>
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
-                  onClick={() => { setDropdownOpen(false); onRunDockerInstall?.() }}
-                >
-                  <Package size={11} className="text-blue-300" />
-                  <span>Docker (install deps)</span>
-                </button>
                 {pipelineType === 'ml' && (
                   <button
                     className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted border-t border-border mt-1 pt-2"

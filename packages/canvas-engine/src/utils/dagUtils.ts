@@ -117,6 +117,25 @@ export function detectCycle(nodes: PipelineNode[], edges: PipelineEdge[]): boole
   }
 }
 
+/**
+ * Fields that represent data-schema concepts (column names, feature lists)
+ * shared across multiple nodes in a pipeline.  When one of these fields
+ * changes on a node, the new value is automatically propagated to every
+ * directly and indirectly downstream node that already carries that key.
+ */
+export const PROPAGATABLE_FIELDS = new Set([
+  'target_column',
+  'label_column',
+  'text_column',
+  'feature_columns',
+  'id_column',
+  'date_column',
+  'datetime_column',
+  'input_column',
+  'output_column',
+  'embed_column',
+])
+
 /** Returns the set of node IDs reachable from startId */
 export function reachableFrom(startId: string, edges: PipelineEdge[]): Set<string> {
   const visited = new Set<string>()

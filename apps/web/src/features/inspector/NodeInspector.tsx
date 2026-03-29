@@ -4,6 +4,7 @@ import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
 import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
+import { getNodeIntegrationDefaults } from '../../lib/integrations'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -105,17 +106,20 @@ export function NodeInspector() {
           <p className="text-[11px] text-muted-foreground">{definition.description}</p>
 
           {/* Config form */}
-          {schema.properties &&
-            Object.entries(schema.properties).map(([key, propDef]) => (
+          {schema.properties && (() => {
+            const integrationDefaults = getNodeIntegrationDefaults(node.definitionId)
+            return Object.entries(schema.properties).map(([key, propDef]) => (
               <FormField
                 key={key}
                 fieldKey={key}
                 schema={propDef as JSONSchema7}
                 required={(schema.required ?? []).includes(key)}
                 value={config[key]}
+                fromIntegration={key in integrationDefaults}
                 onChange={(v) => handleChange(key, v)}
               />
-            ))}
+            ))
+          })()}
 
           {/* Connector actions (ingest nodes only) */}
           {isIngestNode && (
@@ -219,11 +223,22 @@ interface FormFieldProps {
   schema: JSONSchema7
   required: boolean
   value: unknown
+  fromIntegration?: boolean
   onChange: (v: unknown) => void
 }
 
-function FormField({ fieldKey, schema, required, value, onChange }: FormFieldProps) {
-  const label = (schema.title ?? fieldKey) + (required ? ' *' : '')
+function FormField({ fieldKey, schema, required, value, fromIntegration, onChange }: FormFieldProps) {
+  const baseLabel = (schema.title ?? fieldKey) + (required ? ' *' : '')
+  const label = (
+    <span className="flex items-center gap-1">
+      {baseLabel}
+      {fromIntegration && (
+        <span title="Pre-filled from Integrations settings" className="rounded bg-blue-500/20 px-1 py-0 text-[9px] font-semibold text-blue-400">
+          integration
+        </span>
+      )}
+    </span>
+  )
 
   if (schema.enum) {
     return (
@@ -310,7 +325,7 @@ function FormField({ fieldKey, schema, required, value, onChange }: FormFieldPro
 // ---------------------------------------------------------------------------
 
 interface FilePathFieldProps {
-  label: string
+  label: React.ReactNode
   value: string
   onChange: (v: string) => void
 }

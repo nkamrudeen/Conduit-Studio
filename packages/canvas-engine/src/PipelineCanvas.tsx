@@ -29,6 +29,8 @@ const nodeTypes = { pipelineNode: BaseNode }
 interface PipelineCanvasProps {
   definitionMap: Map<string, NodeDefinition>
   onNodeSelect?: (nodeId: string | null) => void
+  /** Optional: called when a node is dropped; returns initial config to pre-fill */
+  getNodeDefaults?: (definitionId: string) => Record<string, unknown>
 }
 
 interface ContextMenuState {
@@ -196,7 +198,7 @@ function TypeBadge({ label, type }: { label: string; type: string }) {
 }
 
 // ── Inner canvas (must be inside ReactFlowProvider) ──────────────────────────
-function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
+function CanvasContent({ definitionMap, onNodeSelect, getNodeDefaults }: PipelineCanvasProps) {
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const connectionErrorRef = useRef<string | null>(null)
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -433,10 +435,11 @@ function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
       const definitionId = event.dataTransfer.getData('application/ai-ide-node')
       if (!definitionId) return
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
-      addNode(definitionId, position)
+      const defaults = getNodeDefaults?.(definitionId)
+      addNode(definitionId, position, defaults)
       onNodeSelect?.(definitionId)
     },
-    [addNode, screenToFlowPosition, onNodeSelect]
+    [addNode, screenToFlowPosition, onNodeSelect, getNodeDefaults]
   )
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {

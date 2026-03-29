@@ -9,7 +9,7 @@ interface PipelineState {
   selectedNodeId: string | null
 
   // Actions
-  addNode: (definitionId: string, position: { x: number; y: number }) => string
+  addNode: (definitionId: string, position: { x: number; y: number }, initialConfig?: Record<string, unknown>) => string
   updateNodeConfig: (nodeId: string, config: Record<string, unknown>) => void
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void
   updateNodeStatus: (nodeId: string, status: 'idle' | 'running' | 'success' | 'error') => void
@@ -36,14 +36,14 @@ export const usePipelineStore = create<PipelineState>()(
     dag: emptyDag('ml'),
     selectedNodeId: null,
 
-    addNode: (definitionId, position) => {
+    addNode: (definitionId, position, initialConfig) => {
       const id = uuid()
       set((state) => {
         const node: PipelineNode = {
           id,
           definitionId,
           position,
-          config: {},
+          config: initialConfig ?? {},
           status: 'idle',
         }
         state.dag.nodes.push(node)

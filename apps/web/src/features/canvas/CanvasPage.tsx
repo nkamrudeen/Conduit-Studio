@@ -13,6 +13,7 @@ import { AgentPanel } from '../agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
 import { Bot, CheckCircle2, XCircle, X } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
+import { getNodeIntegrationDefaults } from '../../lib/integrations'
 
 export function CanvasPage() {
   const { type = 'ml' } = useParams<{ type: string }>()
@@ -200,7 +201,10 @@ export function CanvasPage() {
             </TabsList>
           </div>
           <TabsContent value="canvas" className="m-0 flex-1 overflow-hidden relative">
-            <PipelineCanvas definitionMap={definitionMap} />
+            <PipelineCanvas
+              definitionMap={definitionMap}
+              getNodeDefaults={getNodeIntegrationDefaults}
+            />
             {/* Floating AI Agent button */}
             <button
               onClick={() => setShowAgent((v) => !v)}

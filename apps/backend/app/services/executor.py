@@ -128,6 +128,20 @@ def _get_python_executable() -> str:
     return sys.executable
 
 
+def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = None) -> list[str]:
+    """Return the best available command to install *packages*.
+
+    uv-managed virtual environments are created without pip by default.
+    When ``uv`` is on PATH, prefer ``uv pip install`` which works in any
+    uv venv.  Otherwise fall back to ``sys.executable -m pip install``.
+    """
+    flags = extra_flags or []
+    uv = shutil.which("uv")
+    if uv:
+        return [uv, "pip", "install"] + flags + packages
+    return [sys.executable, "-m", "pip", "install"] + flags + packages
+
+
 async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
     """Run the pipeline described by *dag* and stream output to a queue.
 
@@ -300,6 +314,22 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
         # ── 3. docker build ───────────────────────────────────────────────
         docker_exe = shutil.which("docker") or "docker"
         await queue.put({"type": "log", "text": f"[Docker] Using: {docker_exe}", "stream": "stdout"})
+
+        # Verify Docker daemon is reachable before attempting a build.
+        docker_check_rc = await _stream_subprocess(
+            [docker_exe, "info"],
+            lambda _l, _s: asyncio.sleep(0),
+        )
+        if docker_check_rc != 0:
+            await queue.put({
+                "type": "error",
+                "text": "Docker is not running. Open Docker Desktop and wait for it to start, then try again.",
+            })
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
+
         await queue.put({"type": "log", "text": "[Docker] Building image…", "stream": "stdout"})
 
         async def _on_build_line(line: str, _stream_name: str) -> None:
@@ -423,7 +453,7 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any]) -> Non
                     await queue.put({"type": "log", "text": f"[pip] {line}", "stream": stream_name})
 
             install_rc = await _stream_subprocess(
-                [sys.executable, "-m", "pip", "install", "--quiet"] + packages,
+                _get_pip_install_cmd(packages, ["--quiet"]),
                 _on_install_line,
             )
             if install_rc != 0:
@@ -533,19 +563,20 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
         with open(os.path.join(tmp_dir, "Dockerfile"), "w", encoding="utf-8") as f:
             f.write(dockerfile)
 
-        # ── 2b. Pre-validate packages via pip install ──────────────────────
-        if packages:
-            await queue.put({"type": "log", "text": f"[Install] Pre-checking packages: {' '.join(packages)}", "stream": "stdout"})
-
-            async def _on_pip(line: str, sn: str) -> None:
-                if line:
-                    await queue.put({"type": "log", "text": f"[pip] {line}", "stream": sn})
-
-            await _stream_subprocess(
-                [sys.executable, "-m", "pip", "install", "--dry-run", "--quiet"] + packages,
-                _on_pip,
-            )
-            await queue.put({"type": "log", "text": "[Install] Package check complete. Building image...", "stream": "stdout"})
+        # ── 2b. Verify Docker is reachable before attempting a build ──────
+        docker_check_rc = await _stream_subprocess(
+            [docker_exe, "info"],
+            lambda _l, _s: asyncio.sleep(0),  # discard docker info output
+        )
+        if docker_check_rc != 0:
+            await queue.put({
+                "type": "error",
+                "text": "Docker is not running. Open Docker Desktop and wait for it to start, then try again.",
+            })
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
 
         await queue.put({"type": "log", "text": f"[Docker] Build context: {tmp_dir}", "stream": "stdout"})
         await queue.put({"type": "log", "text": f"[Docker] Image tag: {image_tag}", "stream": "stdout"})
@@ -553,6 +584,22 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
         # ── 3. docker build ───────────────────────────────────────────────
         docker_exe = shutil.which("docker") or "docker"
         await queue.put({"type": "log", "text": f"[Docker] Using: {docker_exe}", "stream": "stdout"})
+
+        # Verify Docker daemon is reachable before attempting a build.
+        docker_check_rc = await _stream_subprocess(
+            [docker_exe, "info"],
+            lambda _l, _s: asyncio.sleep(0),
+        )
+        if docker_check_rc != 0:
+            await queue.put({
+                "type": "error",
+                "text": "Docker is not running. Open Docker Desktop and wait for it to start, then try again.",
+            })
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
+
         await queue.put({"type": "log", "text": "[Docker] Building image…", "stream": "stdout"})
 
         async def _on_build_line(line: str, _stream_name: str) -> None:
@@ -673,7 +720,7 @@ async def execute_pipeline_kubeflow(
                 await queue.put({"type": "log", "text": f"[pip] {line}", "stream": sn})
 
         await _stream_subprocess(
-            [sys.executable, "-m", "pip", "install", "--quiet", "kfp>=2.0"],
+            _get_pip_install_cmd(["kfp>=2.0"], ["--quiet"]),
             _on_pip,
         )
 

@@ -27,6 +27,9 @@ def main() -> None:
         log_level="info",
         # Disable reload in bundled mode — file watching is meaningless
         reload=False,
+        # Python 3.14 on Windows changed ProactorEventLoop socket handling;
+        # force asyncio loop to avoid WinError 10022 in uvicorn's multiprocess path.
+        loop="asyncio",
     )
 
 

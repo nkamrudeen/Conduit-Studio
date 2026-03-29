@@ -21,7 +21,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import traceback
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from app.models.pipeline import PipelineDAG
@@ -48,6 +50,66 @@ def get_queue(run_id: str) -> asyncio.Queue | None:
 def get_status(run_id: str) -> str | None:
     """Return the current status string for *run_id*, or None if unknown."""
     return _run_status.get(run_id)
+
+
+# ---------------------------------------------------------------------------
+# Thread-based subprocess streamer
+# ---------------------------------------------------------------------------
+
+async def _stream_subprocess(
+    cmd: list[str],
+    on_line: Callable[[str, str], Awaitable[None]],
+    cwd: str | None = None,
+    combine_stderr: bool = False,
+) -> int:
+    """Run *cmd* as a subprocess, calling ``on_line(line, stream_name)`` for
+    each line of output.
+
+    Uses ``subprocess.Popen`` + background threads to read output, then
+    forwards lines to the caller via an ``asyncio.Queue``.  This approach works
+    on *both* ``ProactorEventLoop`` and ``SelectorEventLoop`` (the Windows
+    default when uvicorn is started with ``--loop asyncio`` under Python 3.14+,
+    where ``asyncio.create_subprocess_exec`` raises ``NotImplementedError``).
+    """
+    loop = asyncio.get_running_loop()
+    line_queue: asyncio.Queue[tuple[str, str] | None] = asyncio.Queue()
+
+    def _reader(stream, name: str) -> None:
+        try:
+            for raw in stream:
+                line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                asyncio.run_coroutine_threadsafe(line_queue.put((line, name)), loop)
+        finally:
+            # Sentinel: tells the async drain loop this stream is finished.
+            asyncio.run_coroutine_threadsafe(line_queue.put(None), loop)
+
+    stderr_opt = subprocess.STDOUT if combine_stderr else subprocess.PIPE
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr_opt, cwd=cwd)
+
+    # One sentinel per open stream.
+    num_sentinels = 1 if combine_stderr else 2
+    threads: list[threading.Thread] = [
+        threading.Thread(target=_reader, args=(proc.stdout, "stdout"), daemon=True)
+    ]
+    if not combine_stderr and proc.stderr is not None:
+        threads.append(
+            threading.Thread(target=_reader, args=(proc.stderr, "stderr"), daemon=True)
+        )
+    for t in threads:
+        t.start()
+
+    # Drain lines on the event loop until both stream threads send their sentinels.
+    done = 0
+    while done < num_sentinels:
+        item = await line_queue.get()
+        if item is None:
+            done += 1
+        else:
+            line, stream_name = item
+            await on_line(line, stream_name)
+
+    # By the time both streams are closed the process has exited or is about to.
+    return await asyncio.to_thread(proc.wait)
 
 
 # ---------------------------------------------------------------------------
@@ -126,45 +188,24 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(code)
 
-        # ── 3. Launch subprocess ──────────────────────────────────────────
-        # In a PyInstaller bundle sys.executable is the bundled .exe, not Python.
-        # Generated pipeline scripts must run under the user's system Python.
+        # ── 3. Launch subprocess and stream output ────────────────────────
         python_exe = _get_python_executable()
-        proc = await asyncio.create_subprocess_exec(
-            python_exe,
-            tmp_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
 
-        # ── 4. Stream stdout and stderr concurrently ──────────────────────
-        async def _drain(stream: asyncio.StreamReader, stream_name: str) -> None:
-            while True:
-                line_bytes = await stream.readline()
-                if not line_bytes:
-                    break
-                line = line_bytes.decode("utf-8", errors="replace").rstrip("\r\n")
+        async def _on_line(line: str, stream_name: str) -> None:
+            if line.startswith("__AIIDE_NODE_START:"):
+                node_id = line[len("__AIIDE_NODE_START:"):-2]  # strip trailing __
+                await queue.put({"type": "status", "status": "running", "node_id": node_id})
+            elif line.startswith("__AIIDE_NODE_END:"):
+                parts = line[len("__AIIDE_NODE_END:"):-2].split(":")
+                if len(parts) == 2:
+                    node_id, status = parts
+                    await queue.put({"type": "status", "status": status, "node_id": node_id})
+            else:
+                await queue.put({"type": "log", "text": line, "stream": stream_name})
 
-                # Parse per-node status markers injected during code generation
-                if line.startswith("__AIIDE_NODE_START:"):
-                    node_id = line[len("__AIIDE_NODE_START:"):-2]  # strip trailing __
-                    await queue.put({"type": "status", "status": "running", "node_id": node_id})
-                elif line.startswith("__AIIDE_NODE_END:"):
-                    parts = line[len("__AIIDE_NODE_END:"):-2].split(":")
-                    if len(parts) == 2:
-                        node_id, status = parts
-                        await queue.put({"type": "status", "status": status, "node_id": node_id})
-                else:
-                    await queue.put({"type": "log", "text": line, "stream": stream_name})
+        return_code = await _stream_subprocess([python_exe, tmp_path], _on_line)
 
-        await asyncio.gather(
-            _drain(proc.stdout, "stdout"),  # type: ignore[arg-type]
-            _drain(proc.stderr, "stderr"),  # type: ignore[arg-type]
-        )
-
-        return_code = await proc.wait()
-
-        # ── 5. Final status ───────────────────────────────────────────────
+        # ── 4. Final status ───────────────────────────────────────────────
         if return_code == 0:
             final_status = "success"
         else:
@@ -193,7 +234,7 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any]) -> None:
         await queue.put({"type": "status", "status": "error", "node_id": None})
 
     finally:
-        # ── 6. Sentinel — always sent so consumers exit cleanly ───────────
+        # ── 5. Sentinel — always sent so consumers exit cleanly ───────────
         await queue.put({"type": "done"})
 
         # Clean up temp file (best-effort).
@@ -261,27 +302,16 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
         await queue.put({"type": "log", "text": f"[Docker] Using: {docker_exe}", "stream": "stdout"})
         await queue.put({"type": "log", "text": "[Docker] Building image…", "stream": "stdout"})
 
-        build_proc = await asyncio.create_subprocess_exec(
-            docker_exe, "build", "--tag", image_tag, ".",
+        async def _on_build_line(line: str, _stream_name: str) -> None:
+            if line:
+                await queue.put({"type": "log", "text": f"[build] {line}", "stream": "stdout"})
+
+        build_rc = await _stream_subprocess(
+            [docker_exe, "build", "--tag", image_tag, "."],
+            _on_build_line,
             cwd=tmp_dir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+            combine_stderr=True,
         )
-
-        async def _stream(stream: asyncio.StreamReader | None, label: str) -> None:
-            if stream is None:
-                return
-            while True:
-                line_bytes = await stream.readline()
-                if not line_bytes:
-                    break
-                # Strip both \r and \n so Windows CRLF lines render cleanly
-                line = line_bytes.decode("utf-8", errors="replace").rstrip("\r\n")
-                if line:
-                    await queue.put({"type": "log", "text": f"[{label}] {line}", "stream": "stdout"})
-
-        await _stream(build_proc.stdout, "build")
-        build_rc = await build_proc.wait()
 
         if build_rc != 0:
             await queue.put({"type": "error", "text": f"docker build failed (exit {build_rc})"})
@@ -293,17 +323,14 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
         await queue.put({"type": "log", "text": "[Docker] Image built. Starting container…", "stream": "stdout"})
 
         # ── 4. docker run ─────────────────────────────────────────────────
-        run_proc = await asyncio.create_subprocess_exec(
-            docker_exe, "run", "--rm", image_tag,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        async def _on_run_line(line: str, stream_name: str) -> None:
+            if line:
+                await queue.put({"type": "log", "text": line, "stream": stream_name})
 
-        await asyncio.gather(
-            _stream(run_proc.stdout, "container"),  # type: ignore[arg-type]
-            _stream(run_proc.stderr, "container"),  # type: ignore[arg-type]
+        run_rc = await _stream_subprocess(
+            [docker_exe, "run", "--rm", image_tag],
+            _on_run_line,
         )
-        run_rc = await run_proc.wait()
 
         if run_rc == 0:
             _run_status[run_id] = "success"
@@ -326,11 +353,8 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
         exc_type = type(exc).__name__
         exc_msg = str(exc) or repr(exc) or "(no message)"
         tb = traceback.format_exc()
-        # Print full traceback to server stderr for debugging
         print(f"[executor] Docker error ({exc_type}): {exc_msg}\n{tb}", file=sys.stderr, flush=True)
-        # Send a clean one-line summary to the UI
         await queue.put({"type": "error", "text": f"Docker executor error ({exc_type}): {exc_msg}"})
-        # Send traceback as individual log lines so they're visible in the panel
         for tb_line in tb.splitlines():
             if tb_line.strip():
                 await queue.put({"type": "log", "text": tb_line, "stream": "stderr"})

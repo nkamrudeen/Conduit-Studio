@@ -6,6 +6,8 @@ import { spawn, ChildProcess } from 'child_process'
 import { registerFileHandlers } from './ipc/fileHandlers'
 import { registerBackendHandlers } from './ipc/backendHandlers'
 
+app.name = 'Conduit Studio'
+
 const isDev = process.env.NODE_ENV === 'development'
 let mainWindow: BrowserWindow | null = null
 let backendProcess: ChildProcess | null = null
@@ -33,7 +35,7 @@ function spawnBackend(): void {
     // Development: run via uv (or fall back to python) from the source tree
     const uvPath = process.platform === 'win32' ? 'uv.exe' : 'uv'
     cmd = uvPath
-    args = ['run', 'uvicorn', 'app.main:app', '--port', '8000']
+    args = ['run', 'uvicorn', 'app.main:app', '--port', '8000', '--loop', 'asyncio']
     cwd = backendDir
   } else {
     // Production: launch the PyInstaller self-contained executable
@@ -117,9 +119,11 @@ function createWindow(): void {
       mainWindow?.loadURL('http://localhost:3001')
     }, 2000)
   } else {
-    // Wait for backend to be ready before loading the app
+    // Wait for backend to be ready before loading the app.
+    // In the packaged asar, __dirname = resources/app.asar/dist/
+    // The web dist is bundled as an extraResource at resources/web/
     setTimeout(() => {
-      const webAppPath = path.join(__dirname, '..', '..', 'web', 'dist', 'index.html')
+      const webAppPath = path.join(process.resourcesPath, 'web', 'index.html')
       mainWindow?.loadFile(webAppPath)
     }, 2000)
   }

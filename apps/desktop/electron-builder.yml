@@ -12,6 +12,12 @@ files:
   - "!node_modules/*/{CHANGELOG.md,README.md,readme.md}"
 
 extraResources:
+  # Web app (built by vite: pnpm --filter @ai-ide/web build)
+  # Loaded in production via process.resourcesPath/web/index.html
+  - from: ../../apps/web/dist
+    to: web
+    filter:
+      - "**/*"
   # PyInstaller onedir bundle — built by running:
   #   cd apps/backend && pyinstaller conduit-backend.spec
   # The entire dist/conduit-backend/ folder (exe + all deps) is bundled here.

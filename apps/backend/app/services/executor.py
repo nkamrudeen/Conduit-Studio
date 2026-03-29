@@ -375,3 +375,376 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
                 shutil.rmtree(tmp_dir, ignore_errors=True)
             except Exception:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Install-then-run executor (local)
+# ---------------------------------------------------------------------------
+
+async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any]) -> None:
+    """Like execute_pipeline but pip-installs required packages first."""
+    queue: asyncio.Queue = asyncio.Queue()
+    _run_queues[run_id] = queue
+    _run_status[run_id] = "running"
+    await queue.put({"type": "status", "status": "running", "node_id": None})
+
+    tmp_path: str | None = None
+    try:
+        # ── 1. Code generation ────────────────────────────────────────────
+        try:
+            dag_obj = PipelineDAG(**dag)
+            ordered, snippets, packages = generate_snippets(dag_obj)
+            wrapped: list[str] = []
+            for node, snippet in zip(ordered, snippets):
+                nid = node.id
+                indented = "\n".join("    " + line for line in snippet.splitlines())
+                wrapped.append(
+                    f'print("__AIIDE_NODE_START:{nid}__", flush=True)\n'
+                    f"try:\n{indented}\n"
+                    f'    print("__AIIDE_NODE_END:{nid}:success__", flush=True)\n'
+                    f"except Exception as _aiide_exc:\n"
+                    f'    print(f"__AIIDE_NODE_END:{nid}:error__", flush=True)\n'
+                    f"    raise\n"
+                )
+            code, _ = python_gen.assemble(dag_obj, wrapped, packages)
+        except Exception as exc:
+            await queue.put({"type": "error", "text": f"Code generation failed: {exc}"})
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            _run_status[run_id] = "error"
+            await queue.put({"type": "done"})
+            return
+
+        # ── 2. Install packages ───────────────────────────────────────────
+        if packages:
+            await queue.put({"type": "log", "text": f"[Install] Installing: {' '.join(packages)}", "stream": "stdout"})
+
+            async def _on_install_line(line: str, stream_name: str) -> None:
+                if line:
+                    await queue.put({"type": "log", "text": f"[pip] {line}", "stream": stream_name})
+
+            install_rc = await _stream_subprocess(
+                [sys.executable, "-m", "pip", "install", "--quiet"] + packages,
+                _on_install_line,
+            )
+            if install_rc != 0:
+                await queue.put({"type": "error", "text": f"pip install failed (exit {install_rc})"})
+                _run_status[run_id] = "error"
+                await queue.put({"type": "status", "status": "error", "node_id": None})
+                await queue.put({"type": "done"})
+                return
+            await queue.put({"type": "log", "text": "[Install] Packages ready.", "stream": "stdout"})
+
+        # ── 3. Write and run script ───────────────────────────────────────
+        fd, tmp_path = tempfile.mkstemp(suffix=".py", prefix=f"aiide_{run_id[:8]}_")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(code)
+
+        python_exe = _get_python_executable()
+
+        async def _on_line(line: str, stream_name: str) -> None:
+            if line.startswith("__AIIDE_NODE_START:"):
+                node_id = line[len("__AIIDE_NODE_START:"):-2]
+                await queue.put({"type": "status", "status": "running", "node_id": node_id})
+            elif line.startswith("__AIIDE_NODE_END:"):
+                parts = line[len("__AIIDE_NODE_END:"):-2].split(":")
+                if len(parts) == 2:
+                    node_id, status = parts
+                    await queue.put({"type": "status", "status": status, "node_id": node_id})
+            else:
+                await queue.put({"type": "log", "text": line, "stream": stream_name})
+
+        return_code = await _stream_subprocess([python_exe, tmp_path], _on_line)
+        if return_code == 0:
+            final_status = "success"
+        else:
+            final_status = "error"
+            await queue.put({"type": "log", "text": f"Process exited with code {return_code}", "stream": "stderr"})
+
+        _run_status[run_id] = final_status
+        await queue.put({"type": "status", "status": final_status, "node_id": None})
+
+    except Exception as exc:
+        _run_status[run_id] = "error"
+        exc_type = type(exc).__name__
+        exc_msg = str(exc) or repr(exc) or "(no message)"
+        tb = traceback.format_exc()
+        print(f"[executor] install+run error ({exc_type}): {exc_msg}\n{tb}", file=sys.stderr, flush=True)
+        await queue.put({"type": "error", "text": f"Executor error ({exc_type}): {exc_msg}"})
+        for tb_line in tb.splitlines():
+            if tb_line.strip():
+                await queue.put({"type": "log", "text": tb_line, "stream": "stderr"})
+        await queue.put({"type": "status", "status": "error", "node_id": None})
+    finally:
+        await queue.put({"type": "done"})
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Install-then-Docker executor
+# ---------------------------------------------------------------------------
+
+async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any]) -> None:
+    """Build and run the pipeline in Docker, pre-validating packages via pip first.
+
+    Steps:
+    1. Generate pipeline.py, Dockerfile, and requirements.txt into a temp dir.
+    2. Pre-validate required packages with pip install --dry-run.
+    3. Run ``docker build`` — streams build output to the queue.
+    4. Run ``docker run --rm`` — streams container stdout/stderr.
+    5. Removes the Docker image on completion (best-effort).
+    6. Cleans up the temp directory.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    _run_queues[run_id] = queue
+    _run_status[run_id] = "running"
+
+    await queue.put({"type": "status", "status": "running", "node_id": None})
+
+    tmp_dir: str | None = None
+    image_tag = f"aiide-pipeline-{run_id[:8]}"
+
+    try:
+        dag_obj = PipelineDAG(**dag)
+
+        # ── 1. Generate code artefacts ────────────────────────────────────
+        try:
+            from app.services.codegen import docker_gen
+            ordered, snippets, packages = generate_snippets(dag_obj)
+            pipeline_code, _ = python_gen.assemble(dag_obj, snippets, packages)
+            requirements = "\n".join(packages) + "\n" if packages else ""
+            dockerfile = docker_gen.DOCKERFILE.format(name=dag_obj.name)
+        except Exception as exc:
+            await queue.put({"type": "error", "text": f"Code generation failed: {exc}"})
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            _run_status[run_id] = "error"
+            await queue.put({"type": "done"})
+            return
+
+        # ── 2. Write artefacts to temp directory ──────────────────────────
+        tmp_dir = tempfile.mkdtemp(prefix=f"aiide_docker_{run_id[:8]}_")
+        with open(os.path.join(tmp_dir, "pipeline.py"), "w", encoding="utf-8") as f:
+            f.write(pipeline_code)
+        with open(os.path.join(tmp_dir, "requirements.txt"), "w", encoding="utf-8") as f:
+            f.write(requirements)
+        with open(os.path.join(tmp_dir, "Dockerfile"), "w", encoding="utf-8") as f:
+            f.write(dockerfile)
+
+        # ── 2b. Pre-validate packages via pip install ──────────────────────
+        if packages:
+            await queue.put({"type": "log", "text": f"[Install] Pre-checking packages: {' '.join(packages)}", "stream": "stdout"})
+
+            async def _on_pip(line: str, sn: str) -> None:
+                if line:
+                    await queue.put({"type": "log", "text": f"[pip] {line}", "stream": sn})
+
+            await _stream_subprocess(
+                [sys.executable, "-m", "pip", "install", "--dry-run", "--quiet"] + packages,
+                _on_pip,
+            )
+            await queue.put({"type": "log", "text": "[Install] Package check complete. Building image...", "stream": "stdout"})
+
+        await queue.put({"type": "log", "text": f"[Docker] Build context: {tmp_dir}", "stream": "stdout"})
+        await queue.put({"type": "log", "text": f"[Docker] Image tag: {image_tag}", "stream": "stdout"})
+
+        # ── 3. docker build ───────────────────────────────────────────────
+        docker_exe = shutil.which("docker") or "docker"
+        await queue.put({"type": "log", "text": f"[Docker] Using: {docker_exe}", "stream": "stdout"})
+        await queue.put({"type": "log", "text": "[Docker] Building image…", "stream": "stdout"})
+
+        async def _on_build_line(line: str, _stream_name: str) -> None:
+            if line:
+                await queue.put({"type": "log", "text": f"[build] {line}", "stream": "stdout"})
+
+        build_rc = await _stream_subprocess(
+            [docker_exe, "build", "--tag", image_tag, "."],
+            _on_build_line,
+            cwd=tmp_dir,
+            combine_stderr=True,
+        )
+
+        if build_rc != 0:
+            await queue.put({"type": "error", "text": f"docker build failed (exit {build_rc})"})
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
+
+        await queue.put({"type": "log", "text": "[Docker] Image built. Starting container…", "stream": "stdout"})
+
+        # ── 4. docker run ─────────────────────────────────────────────────
+        async def _on_run_line(line: str, stream_name: str) -> None:
+            if line:
+                await queue.put({"type": "log", "text": line, "stream": stream_name})
+
+        run_rc = await _stream_subprocess(
+            [docker_exe, "run", "--rm", image_tag],
+            _on_run_line,
+        )
+
+        if run_rc == 0:
+            _run_status[run_id] = "success"
+            await queue.put({"type": "log", "text": "✓ Container exited successfully", "stream": "stdout"})
+        else:
+            _run_status[run_id] = "error"
+            await queue.put({"type": "log", "text": f"Container exited with code {run_rc}", "stream": "stderr"})
+
+        final = "success" if run_rc == 0 else "error"
+        await queue.put({"type": "status", "status": final, "node_id": None})
+
+    except FileNotFoundError:
+        _run_status[run_id] = "error"
+        await queue.put({"type": "error", "text": "Docker not found. Install Docker Desktop and ensure it is running."})
+        await queue.put({"type": "status", "status": "error", "node_id": None})
+
+    except Exception as exc:
+        _run_status[run_id] = "error"
+        exc_type = type(exc).__name__
+        exc_msg = str(exc) or repr(exc) or "(no message)"
+        tb = traceback.format_exc()
+        print(f"[executor] Docker+install error ({exc_type}): {exc_msg}\n{tb}", file=sys.stderr, flush=True)
+        await queue.put({"type": "error", "text": f"Docker executor error ({exc_type}): {exc_msg}"})
+        for tb_line in tb.splitlines():
+            if tb_line.strip():
+                await queue.put({"type": "log", "text": tb_line, "stream": "stderr"})
+        await queue.put({"type": "status", "status": "error", "node_id": None})
+
+    finally:
+        await queue.put({"type": "done"})
+
+        try:
+            subprocess.run(["docker", "rmi", "-f", image_tag], capture_output=True, timeout=10)
+        except Exception:
+            pass
+
+        if tmp_dir is not None:
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Kubeflow executor
+# ---------------------------------------------------------------------------
+
+async def execute_pipeline_kubeflow(
+    run_id: str,
+    dag: dict[str, Any],
+    kubeflow_host: str,
+    experiment_name: str = "Default",
+) -> None:
+    """Compile the pipeline to KFP DSL, then submit it to a Kubeflow Pipelines cluster."""
+    queue: asyncio.Queue = asyncio.Queue()
+    _run_queues[run_id] = queue
+    _run_status[run_id] = "running"
+    await queue.put({"type": "status", "status": "running", "node_id": None})
+
+    tmp_dir: str | None = None
+    try:
+        from app.services.codegen import kubeflow_gen
+
+        dag_obj = PipelineDAG(**dag)
+
+        # ── 1. Generate KFP DSL code ──────────────────────────────────────
+        try:
+            ordered, snippets, packages = generate_snippets(dag_obj)
+            kfp_code, kfp_filename = kubeflow_gen.assemble(dag_obj, snippets, packages)
+        except Exception as exc:
+            await queue.put({"type": "error", "text": f"Code generation failed: {exc}"})
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
+
+        tmp_dir = tempfile.mkdtemp(prefix=f"aiide_kfp_{run_id[:8]}_")
+        kfp_script = os.path.join(tmp_dir, kfp_filename)
+        with open(kfp_script, "w", encoding="utf-8") as f:
+            f.write(kfp_code)
+
+        # ── 2. Ensure kfp SDK is installed ────────────────────────────────
+        await queue.put({"type": "log", "text": "[KFP] Ensuring kfp>=2.0 is installed…", "stream": "stdout"})
+
+        async def _on_pip(line: str, sn: str) -> None:
+            if line:
+                await queue.put({"type": "log", "text": f"[pip] {line}", "stream": sn})
+
+        await _stream_subprocess(
+            [sys.executable, "-m", "pip", "install", "--quiet", "kfp>=2.0"],
+            _on_pip,
+        )
+
+        # ── 3. Compile to pipeline.yaml ───────────────────────────────────
+        await queue.put({"type": "log", "text": "[KFP] Compiling pipeline to YAML…", "stream": "stdout"})
+
+        async def _on_compile(line: str, sn: str) -> None:
+            if line:
+                await queue.put({"type": "log", "text": f"[compile] {line}", "stream": sn})
+
+        compile_rc = await _stream_subprocess(
+            [sys.executable, kfp_script],
+            _on_compile,
+            cwd=tmp_dir,
+        )
+        if compile_rc != 0:
+            await queue.put({"type": "error", "text": f"KFP compilation failed (exit {compile_rc})"})
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
+
+        yaml_path = os.path.join(tmp_dir, "pipeline.yaml")
+        if not os.path.exists(yaml_path):
+            await queue.put({"type": "error", "text": "pipeline.yaml was not produced — check DSL template."})
+            _run_status[run_id] = "error"
+            await queue.put({"type": "status", "status": "error", "node_id": None})
+            await queue.put({"type": "done"})
+            return
+
+        await queue.put({"type": "log", "text": f"[KFP] Submitting to {kubeflow_host} (experiment: {experiment_name})…", "stream": "stdout"})
+
+        # ── 4. Submit via KFP SDK (blocking → run in thread) ─────────────
+        def _submit() -> str:
+            import kfp  # noqa: PLC0415
+            client = kfp.Client(host=kubeflow_host)
+            run_info = client.create_run_from_pipeline_package(
+                pipeline_file=yaml_path,
+                arguments={},
+                run_name=f"{dag_obj.name} [{run_id[:8]}]",
+                experiment_name=experiment_name,
+            )
+            return str(run_info.run_id)
+
+        kfp_run_id = await asyncio.to_thread(_submit)
+        await queue.put({"type": "log", "text": f"[KFP] ✓ Run submitted — ID: {kfp_run_id}", "stream": "stdout"})
+        await queue.put({
+            "type": "log",
+            "text": f"[KFP] View: {kubeflow_host.rstrip('/')}/#/runs/details/{kfp_run_id}",
+            "stream": "stdout",
+        })
+
+        _run_status[run_id] = "success"
+        await queue.put({"type": "status", "status": "success", "node_id": None})
+
+    except Exception as exc:
+        _run_status[run_id] = "error"
+        exc_type = type(exc).__name__
+        exc_msg = str(exc) or repr(exc) or "(no message)"
+        tb = traceback.format_exc()
+        print(f"[executor] KFP error ({exc_type}): {exc_msg}\n{tb}", file=sys.stderr, flush=True)
+        await queue.put({"type": "error", "text": f"KFP executor error ({exc_type}): {exc_msg}"})
+        for tb_line in tb.splitlines():
+            if tb_line.strip():
+                await queue.put({"type": "log", "text": tb_line, "stream": "stderr"})
+        await queue.put({"type": "status", "status": "error", "node_id": None})
+
+    finally:
+        await queue.put({"type": "done"})
+        if tmp_dir is not None:
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass

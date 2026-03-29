@@ -25,6 +25,10 @@ export function CanvasPage() {
   const [showAgent, setShowAgent] = useState(false)
   const [validateResult, setValidateResult] = useState<PortTypeError[] | null>(null)
 
+  const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
+  const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
+  const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
+
   // Switch pipeline mode when URL changes
   React.useEffect(() => {
     if (dag.pipeline !== pipelineType) {
@@ -64,6 +68,35 @@ export function CanvasPage() {
 
   const handleRun = useCallback(() => startRun('/api/pipeline/run'), [startRun])
   const handleRunDocker = useCallback(() => startRun('/api/pipeline/run-docker'), [startRun])
+  const handleRunInstall = useCallback(() => startRun('/api/pipeline/run-install'), [startRun])
+  const handleRunDockerInstall = useCallback(() => startRun('/api/pipeline/run-docker-install'), [startRun])
+  const handleRunKubeflow = useCallback(() => setShowKubeflowDialog(true), [])
+
+  const submitKubeflowRun = useCallback(async () => {
+    setShowKubeflowDialog(false)
+    if (dag.nodes.length === 0) return
+    setRunError(null)
+    dag.nodes.forEach((n) => updateNodeStatus(n.id, 'idle'))
+    try {
+      setIsRunning(true)
+      setShowLogs(true)
+      const res = await fetch('/api/pipeline/run-kubeflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, experiment_name: kubeflowExperiment }),
+      })
+      if (!res.ok) throw new Error(`Backend error ${res.status}: ${await res.text()}`)
+      const { run_id } = await res.json()
+      setRunId(run_id)
+    } catch (err) {
+      const message = err instanceof TypeError && err.message.includes('fetch')
+        ? 'Cannot reach backend. Start the FastAPI server on port 8000.'
+        : String(err)
+      setRunError(message)
+      setIsRunning(false)
+      setShowLogs(false)
+    }
+  }, [dag, kubeflowHost, kubeflowExperiment, updateNodeStatus])
 
   const handleValidate = useCallback(() => {
     const errors = validatePortTypes(dag, definitionMap)
@@ -105,7 +138,17 @@ export function CanvasPage() {
 
       {/* Center: Canvas + Code Gen */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <CanvasToolbar onRun={handleRun} onRunDocker={handleRunDocker} onStop={handleStop} onValidate={handleValidate} isRunning={isRunning} />
+        <CanvasToolbar
+          onRun={handleRun}
+          onRunDocker={handleRunDocker}
+          onRunInstall={handleRunInstall}
+          onRunDockerInstall={handleRunDockerInstall}
+          onRunKubeflow={handleRunKubeflow}
+          onStop={handleStop}
+          onValidate={handleValidate}
+          isRunning={isRunning}
+          pipelineType={pipelineType}
+        />
 
         {/* Run error banner */}
         {runError && (
@@ -187,6 +230,49 @@ export function CanvasPage() {
         <AgentPanel onClose={() => setShowAgent(false)} />
       ) : (
         <NodeInspector />
+      )}
+
+      {/* Kubeflow run dialog */}
+      {showKubeflowDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-96 rounded-lg border border-border bg-card p-5 shadow-xl">
+            <h3 className="mb-4 text-sm font-semibold">Submit to Kubeflow Pipelines</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">KFP Host URL</label>
+                <input
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  value={kubeflowHost}
+                  onChange={(e) => setKubeflowHost(e.target.value)}
+                  placeholder="http://localhost:8080"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Experiment Name</label>
+                <input
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  value={kubeflowExperiment}
+                  onChange={(e) => setKubeflowExperiment(e.target.value)}
+                  placeholder="Default"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="rounded px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowKubeflowDialog(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                onClick={submitKubeflowRun}
+              >
+                Submit Run
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

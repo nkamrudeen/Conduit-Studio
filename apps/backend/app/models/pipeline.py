@@ -42,3 +42,9 @@ class PipelineRunRequest(BaseModel):
 class PipelineRunResponse(BaseModel):
     run_id: str
     status: Literal["pending", "running", "success", "failed"]
+
+
+class KubeflowRunRequest(BaseModel):
+    dag: PipelineDAG
+    kubeflow_host: str
+    experiment_name: str = "Default"

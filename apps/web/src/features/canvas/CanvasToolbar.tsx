@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck } from 'lucide-react'
+import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck, Cpu, Package } from 'lucide-react'
 import { Button } from '@ai-ide/ui'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import type { PipelineDAG } from '@ai-ide/types'
@@ -7,12 +7,16 @@ import type { PipelineDAG } from '@ai-ide/types'
 interface CanvasToolbarProps {
   onRun?: () => void
   onRunDocker?: () => void
+  onRunInstall?: () => void
+  onRunDockerInstall?: () => void
+  onRunKubeflow?: () => void
   onStop?: () => void
   onValidate?: () => void
   isRunning?: boolean
+  pipelineType?: 'ml' | 'llm'
 }
 
-export function CanvasToolbar({ onRun, onRunDocker, onStop, onValidate, isRunning }: CanvasToolbarProps) {
+export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerInstall, onRunKubeflow, onStop, onValidate, isRunning, pipelineType }: CanvasToolbarProps) {
   const { dag, setDag, resetPipeline } = usePipelineStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -144,6 +148,29 @@ export function CanvasToolbar({ onRun, onRunDocker, onStop, onValidate, isRunnin
                   <Box size={11} className="text-blue-400" />
                   <span>Run as Docker</span>
                 </button>
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
+                  onClick={() => { setDropdownOpen(false); onRunInstall?.() }}
+                >
+                  <Package size={11} className="text-green-400" />
+                  <span>Run (install deps)</span>
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
+                  onClick={() => { setDropdownOpen(false); onRunDockerInstall?.() }}
+                >
+                  <Package size={11} className="text-blue-300" />
+                  <span>Docker (install deps)</span>
+                </button>
+                {pipelineType === 'ml' && (
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted border-t border-border mt-1 pt-2"
+                    onClick={() => { setDropdownOpen(false); onRunKubeflow?.() }}
+                  >
+                    <Cpu size={11} className="text-orange-400" />
+                    <span>Run on Kubeflow</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

@@ -22,11 +22,13 @@ export function CodeGenPanel() {
   const { dag } = usePipelineStore()
   const [activeFormat, setActiveFormat] = useState<CodeGenFormat>('python')
   const [results, setResults] = useState<Partial<Record<CodeGenFormat, GeneratedCode>>>({})
+  const [editedCode, setEditedCode] = useState<Partial<Record<CodeGenFormat, string>>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const generate = useCallback(async () => {
     if (dag.nodes.length === 0) return
+    setEditedCode(prev => { const next = { ...prev }; delete next[activeFormat]; return next })
     setLoading(true)
     setError(null)
     try {
@@ -48,14 +50,15 @@ export function CodeGenPanel() {
   const download = useCallback(() => {
     const result = results[activeFormat]
     if (!result) return
-    const blob = new Blob([result.code], { type: 'text/plain' })
+    const code = editedCode[activeFormat] ?? result.code
+    const blob = new Blob([code], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = result.filename
     a.click()
     URL.revokeObjectURL(url)
-  }, [results, activeFormat])
+  }, [results, editedCode, activeFormat])
 
   const current = results[activeFormat]
   const monacoLang =
@@ -71,11 +74,20 @@ export function CodeGenPanel() {
             {FORMATS.map((f) => (
               <TabsTrigger key={f.id} value={f.id} className="h-6 px-2 text-[11px]">
                 {f.label}
+                {editedCode[f.id] !== undefined && (
+                  <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-yellow-400" title="Edited" />
+                )}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
         <div className="ml-auto flex gap-1.5">
+          {editedCode[activeFormat] !== undefined && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs text-yellow-400 hover:text-yellow-300"
+              onClick={() => setEditedCode(prev => { const next = { ...prev }; delete next[activeFormat]; return next })}>
+              Reset
+            </Button>
+          )}
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={generate} disabled={loading || dag.nodes.length === 0}>
             {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             Generate
@@ -103,16 +115,16 @@ export function CodeGenPanel() {
           <Editor
             height="100%"
             language={monacoLang}
-            value={current.code}
+            value={editedCode[activeFormat] ?? current.code}
             theme="vs-dark"
             options={{
-              readOnly: true,
               minimap: { enabled: false },
               fontSize: 12,
               lineNumbers: 'on',
               scrollBeyondLastLine: false,
               wordWrap: 'on',
             }}
+            onChange={(val) => setEditedCode(prev => ({ ...prev, [activeFormat]: val ?? '' }))}
           />
         )}
       </div>

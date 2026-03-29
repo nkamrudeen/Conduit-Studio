@@ -35,8 +35,10 @@ langchain = [
     "langchain-community>=0.3.0",
     "langchain-ollama>=0.2.0",
 ]
+mcp = ["fastmcp>=2.0"]
+kubeflow = ["kfp>=2.0"]
 all = [
-    "conduit-studio-backend[aws,azure,gcs,db,xgboost,langchain]"
+    "conduit-studio-backend[aws,azure,gcs,db,xgboost,langchain,mcp,kubeflow]"
 ]
 
 [tool.uv]

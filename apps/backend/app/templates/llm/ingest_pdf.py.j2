@@ -2,7 +2,7 @@
 from langchain_community.document_loaders import PyPDFLoader, PyPDFDirectoryLoader
 import os
 
-_path_{{ node_id }} = "{{ config.file_path | default('documents/') }}"
+_path_{{ node_id }} = {{ config.file_path | default('documents/') | tojson }}
 if os.path.isdir(_path_{{ node_id }}):
     _loader_{{ node_id }} = PyPDFDirectoryLoader(_path_{{ node_id }})
 else:

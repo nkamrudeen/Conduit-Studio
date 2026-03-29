@@ -2,7 +2,7 @@
 import pandas as pd
 
 df_{{ node_id }} = pd.read_csv(
-    "{{ config.file_path | default('data.csv') }}",
+    {{ config.file_path | default('data.csv') | tojson }},
     sep="{{ config.separator | default(',') }}",
     encoding="{{ config.encoding | default('utf-8') }}",
     header={{ config.header | default(0) }},

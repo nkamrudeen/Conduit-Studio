@@ -16,6 +16,7 @@ import {
   type NodeChange,
   type EdgeChange,
   type FinalConnectionState,
+  type IsValidConnection,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { usePipelineStore } from './store/pipelineStore'
@@ -258,6 +259,7 @@ function CanvasContent({ definitionMap, onNodeSelect, getNodeDefaults }: Pipelin
       const t = setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 80)
       return () => clearTimeout(t)
     }
+    return undefined
   }, [dag.id])
 
   const handleNodesChange = useCallback(
@@ -307,8 +309,8 @@ function CanvasContent({ definitionMap, onNodeSelect, getNodeDefaults }: Pipelin
     [setRfEdges, storeAddEdge]
   )
 
-  const isValidConnection = useCallback(
-    (connection: Connection) => {
+  const isValidConnection: IsValidConnection = useCallback(
+    (connection: Edge | Connection) => {
       const { source, sourceHandle, target, targetHandle } = connection
       if (!source || !sourceHandle || !target || !targetHandle) return true
 
@@ -401,7 +403,7 @@ function CanvasContent({ definitionMap, onNodeSelect, getNodeDefaults }: Pipelin
         }
       }
 
-      setContextMenu({ type: 'edge', id: edge.id, x: event.clientX, y: event.clientY, edgeDetail })
+      setContextMenu({ type: 'edge', id: edge.id, x: event.clientX, y: event.clientY, ...(edgeDetail ? { edgeDetail } : {}) })
     },
     [dag.edges, dag.nodes, definitionMap]
   )

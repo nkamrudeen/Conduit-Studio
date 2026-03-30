@@ -334,8 +334,9 @@ const REMOTE_OPTIONS: Record<string, Record<string, RemoteOptionsDef>> = {
 
 // Shared: all MLflow tracking nodes with experiment_name + tracking_uri
 for (const id of ['ml.mlflow.autolog', 'ml.mlflow.log_params']) {
-  REMOTE_OPTIONS[id] = {
-    experiment_name: REMOTE_OPTIONS['ml.mlflow.set_experiment'].experiment_name,
+  const expDef = REMOTE_OPTIONS['ml.mlflow.set_experiment']?.experiment_name
+  if (expDef) {
+    REMOTE_OPTIONS[id] = { experiment_name: expDef }
   }
 }
 
@@ -398,7 +399,7 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
     onChange(v)
     if (optionsDef.searchMode) {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [Object.keys(config)[0]]: v }), 400)
+      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [Object.keys(config)[0] as string]: v }), 400)
     }
   }
 

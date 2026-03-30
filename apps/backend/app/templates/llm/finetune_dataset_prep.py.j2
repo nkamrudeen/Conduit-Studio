@@ -10,9 +10,9 @@ import pandas as pd
 {% if source == 'huggingface' %}
 _raw_{{ node_id }} = load_dataset("{{ config.dataset_name | default('tatsu-lab/alpaca') }}", split="train")
 {% elif source == 'csv' %}
-_raw_{{ node_id }} = Dataset.from_pandas(pd.read_csv("{{ config.file_path }}"))
+_raw_{{ node_id }} = Dataset.from_pandas(pd.read_csv({{ config.file_path | tojson }}))
 {% elif source == 'jsonl' %}
-_raw_{{ node_id }} = load_dataset("json", data_files="{{ config.file_path }}", split="train")
+_raw_{{ node_id }} = load_dataset("json", data_files={{ config.file_path | tojson }}, split="train")
 {% endif %}
 
 {% if max_s and max_s > 0 %}

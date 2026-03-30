@@ -3,7 +3,7 @@ import pandas as pd
 
 _columns_{{ node_id }} = {{ config.columns | tojson }} if {{ config.columns | tojson }} else None
 df_{{ node_id }} = pd.read_parquet(
-    "{{ config.file_path }}",
+    {{ config.file_path | tojson }},
     columns=_columns_{{ node_id }},
 )
 print(f"[Parquet Ingest] Loaded {len(df_{{ node_id }})} rows × {df_{{ node_id }}.shape[1]} cols")

@@ -16,6 +16,7 @@ import {
   type NodeChange,
   type EdgeChange,
   type FinalConnectionState,
+  type IsValidConnection,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { usePipelineStore } from './store/pipelineStore'
@@ -29,6 +30,8 @@ const nodeTypes = { pipelineNode: BaseNode }
 interface PipelineCanvasProps {
   definitionMap: Map<string, NodeDefinition>
   onNodeSelect?: (nodeId: string | null) => void
+  /** Optional: called when a node is dropped; returns initial config to pre-fill */
+  getNodeDefaults?: (definitionId: string) => Record<string, unknown>
 }
 
 interface ContextMenuState {
@@ -196,7 +199,7 @@ function TypeBadge({ label, type }: { label: string; type: string }) {
 }
 
 // ── Inner canvas (must be inside ReactFlowProvider) ──────────────────────────
-function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
+function CanvasContent({ definitionMap, onNodeSelect, getNodeDefaults }: PipelineCanvasProps) {
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const connectionErrorRef = useRef<string | null>(null)
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -256,6 +259,7 @@ function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
       const t = setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 80)
       return () => clearTimeout(t)
     }
+    return undefined
   }, [dag.id])
 
   const handleNodesChange = useCallback(
@@ -305,8 +309,8 @@ function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
     [setRfEdges, storeAddEdge]
   )
 
-  const isValidConnection = useCallback(
-    (connection: Connection) => {
+  const isValidConnection: IsValidConnection = useCallback(
+    (connection: Edge | Connection) => {
       const { source, sourceHandle, target, targetHandle } = connection
       if (!source || !sourceHandle || !target || !targetHandle) return true
 
@@ -399,7 +403,7 @@ function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
         }
       }
 
-      setContextMenu({ type: 'edge', id: edge.id, x: event.clientX, y: event.clientY, edgeDetail })
+      setContextMenu({ type: 'edge', id: edge.id, x: event.clientX, y: event.clientY, ...(edgeDetail ? { edgeDetail } : {}) })
     },
     [dag.edges, dag.nodes, definitionMap]
   )
@@ -433,10 +437,11 @@ function CanvasContent({ definitionMap, onNodeSelect }: PipelineCanvasProps) {
       const definitionId = event.dataTransfer.getData('application/ai-ide-node')
       if (!definitionId) return
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
-      addNode(definitionId, position)
+      const defaults = getNodeDefaults?.(definitionId)
+      addNode(definitionId, position, defaults)
       onNodeSelect?.(definitionId)
     },
-    [addNode, screenToFlowPosition, onNodeSelect]
+    [addNode, screenToFlowPosition, onNodeSelect, getNodeDefaults]
   )
 
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {

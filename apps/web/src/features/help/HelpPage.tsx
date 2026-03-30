@@ -369,7 +369,7 @@ const sections: Section[] = [
 
 export function HelpPage() {
   const [active, setActive] = useState('getting-started')
-  const current = sections.find((s) => s.id === active) ?? sections[0]
+  const current = (sections.find((s) => s.id === active) ?? sections[0])!
 
   return (
     <div className="flex h-full w-full overflow-hidden">

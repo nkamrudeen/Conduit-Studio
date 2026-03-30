@@ -24,6 +24,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
     description: 'Experiment tracking, model registry and artifact logging.',
     fields: [
       { key: 'tracking_uri', label: 'Tracking URI', placeholder: 'http://localhost:5000', type: 'url' },
+      { key: 'experiment_name', label: 'Default Experiment Name', placeholder: 'my_experiment' },
       { key: 'artifact_root', label: 'Artifact Root (optional)', placeholder: 'mlflow-artifacts:/' },
     ],
     testEndpoint: '/api/mlflow/experiments',
@@ -46,6 +47,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
     description: 'Download models, push to Hub, and use the Inference API.',
     fields: [
       { key: 'token', label: 'Access Token', placeholder: 'hf_...', type: 'password', envVar: 'HF_TOKEN' },
+      { key: 'username', label: 'Username (for repo_id prefix)', placeholder: 'your-hf-username' },
       { key: 'cache_dir', label: 'Local Cache Dir (optional)', placeholder: '~/.cache/huggingface' },
     ],
     docsUrl: 'https://huggingface.co/docs/hub/security-tokens',
@@ -78,6 +80,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
       { key: 'aws_access_key_id', label: 'Access Key ID', placeholder: 'AKIA...', type: 'password', envVar: 'AWS_ACCESS_KEY_ID' },
       { key: 'aws_secret_access_key', label: 'Secret Access Key', placeholder: '...', type: 'password', envVar: 'AWS_SECRET_ACCESS_KEY' },
       { key: 'aws_region', label: 'Default Region', placeholder: 'us-east-1' },
+      { key: 'default_bucket', label: 'Default Bucket (optional)', placeholder: 'my-ml-bucket' },
     ],
     docsUrl: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html',
   },

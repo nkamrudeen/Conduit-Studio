@@ -1,12 +1,50 @@
 # ── MLflow Model Registration ─────────────────────────────────────────────────
+import os
+os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
+import socket as _socket_mlflow_{{ node_id }}
 import mlflow
 import mlflow.sklearn
 
 {% set model_v = inputs['model'] if 'model' in inputs else input_var %}
 {% set metrics_v = inputs['metrics'] if 'metrics' in inputs else None %}
 
-mlflow.set_tracking_uri("{{ config.mlflow_tracking_uri | default('http://localhost:5000') }}")
+_mlflow_uri_{{ node_id }} = "{{ config.mlflow_tracking_uri | default('http://localhost:5000') }}"
+# On Docker Desktop (Windows/Mac) the executor rewrites localhost → host.docker.internal.
+# Resolve that hostname to an IP *inside the container* so the MLflow HTTP client
+# sends an IP-based Host header, bypassing MLflow's DNS-rebinding protection.
+try:
+    _uri_parts_{{ node_id }} = _mlflow_uri_{{ node_id }}.split("://", 1)
+    _uri_rest_{{ node_id }} = _uri_parts_{{ node_id }}[-1]
+    _uri_hostport_{{ node_id }} = _uri_rest_{{ node_id }}.split("/")[0]
+    _uri_hostname_{{ node_id }} = _uri_hostport_{{ node_id }}.rsplit(":", 1)[0]
+    if _uri_hostname_{{ node_id }} == "host.docker.internal":
+        _resolved_ip_{{ node_id }} = _socket_mlflow_{{ node_id }}.gethostbyname("host.docker.internal")
+        _mlflow_uri_{{ node_id }} = _mlflow_uri_{{ node_id }}.replace(
+            "host.docker.internal", _resolved_ip_{{ node_id }}, 1
+        )
+except OSError:
+    pass  # leave URI unchanged; pre-check below will report the error
+
+# Fast connectivity check — avoids urllib3 retry backoff hang on connection refused
+try:
+    _h_{{ node_id }} = _mlflow_uri_{{ node_id }}.split("://", 1)[-1].split("/")[0]
+    _hp_{{ node_id }} = _h_{{ node_id }}.rsplit(":", 1)
+    _host_{{ node_id }} = _hp_{{ node_id }}[0]
+    _port_{{ node_id }} = int(_hp_{{ node_id }}[1]) if len(_hp_{{ node_id }}) > 1 else 5000
+    with _socket_mlflow_{{ node_id }}.create_connection((_host_{{ node_id }}, _port_{{ node_id }}), timeout=3):
+        pass
+except OSError:
+    print(f"[MLflow] \u2717 Cannot connect to MLflow at {_mlflow_uri_{{ node_id }}}")
+    print("[MLflow] If running in Docker, start the server with:  mlflow server --host 0.0.0.0 --port 5000")
+    raise RuntimeError(f"MLflow unreachable: {_mlflow_uri_{{ node_id }}}")
+
+mlflow.set_tracking_uri(_mlflow_uri_{{ node_id }})
 mlflow.set_experiment("{{ config.experiment_name | default('my_experiment') }}")
+
+import sklearn as _sklearn_{{ node_id }}
+# Explicit pip_requirements bypasses importlib_metadata.packages_distributions()
+# which crashes on Python 3.14 due to a contextlib.suppress C-extension bug.
+_pip_reqs_{{ node_id }} = [f"scikit-learn=={_sklearn_{{ node_id }}.__version__}"]
 
 with mlflow.start_run():
     {% if metrics_v %}
@@ -20,5 +58,6 @@ with mlflow.start_run():
         {{ model_v }},
         artifact_path="model",
         registered_model_name="{{ config.model_name | default('my_model') }}",
+        pip_requirements=_pip_reqs_{{ node_id }},
     )
     print(f"[MLflow] Model registered as '{{ config.model_name | default('my_model') }}'")

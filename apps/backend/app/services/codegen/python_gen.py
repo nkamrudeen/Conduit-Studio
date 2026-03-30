@@ -14,11 +14,27 @@ HEADER = '''\
 
 '''
 
+# On Windows, scikit-learn / joblib spawn worker processes using the `spawn`
+# multiprocessing start method.  Each worker re-imports the __main__ script,
+# which would re-execute the entire pipeline unless the body is guarded.
+MAIN_GUARD_OPEN  = 'if __name__ == "__main__":\n'
+MAIN_GUARD_INDENT = "    "
+
 
 def assemble(dag: PipelineDAG, snippets: list[str], packages: list[str]) -> tuple[str, str]:
     pkg_str = " ".join(packages) if packages else "# (no external packages)"
     header = HEADER.format(name=dag.name, pipeline=dag.pipeline, packages=pkg_str)
-    body = "\n\n".join(snippets)
-    code = header + body + "\n"
+
+    # Indent every line of every snippet so it sits inside the __main__ block.
+    indented_parts: list[str] = []
+    for snippet in snippets:
+        indented = "\n".join(
+            (MAIN_GUARD_INDENT + line) if line.strip() else ""
+            for line in snippet.splitlines()
+        )
+        indented_parts.append(indented)
+
+    body = "\n\n".join(indented_parts)
+    code = header + MAIN_GUARD_OPEN + body + "\n"
     filename = dag.name.lower().replace(" ", "_") + ".py"
     return code, filename

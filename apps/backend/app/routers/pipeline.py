@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
 
-from app.models.pipeline import PipelineRunRequest, PipelineRunResponse
+from app.models.pipeline import PipelineRunRequest, PipelineRunResponse, KubeflowRunRequest
 from app.services import executor
 
 router = APIRouter()
@@ -45,6 +45,55 @@ async def run_pipeline(
         executor.execute_pipeline,
         run_id,
         request.dag.model_dump(),
+        request.env_vars,
+    )
+    return PipelineRunResponse(run_id=run_id, status="pending")
+
+
+@router.post("/run-install", response_model=PipelineRunResponse)
+async def run_pipeline_with_install(
+    request: PipelineRunRequest,
+    background_tasks: BackgroundTasks,
+) -> PipelineRunResponse:
+    """Install required packages via pip, then run the pipeline locally."""
+    run_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        executor.execute_pipeline_with_install,
+        run_id,
+        request.dag.model_dump(),
+        request.env_vars,
+    )
+    return PipelineRunResponse(run_id=run_id, status="pending")
+
+
+@router.post("/run-docker-install", response_model=PipelineRunResponse)
+async def run_pipeline_docker_with_install(
+    request: PipelineRunRequest,
+    background_tasks: BackgroundTasks,
+) -> PipelineRunResponse:
+    """Pre-validate packages, then build and run the pipeline in Docker."""
+    run_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        executor.execute_pipeline_docker_with_install,
+        run_id,
+        request.dag.model_dump(),
+    )
+    return PipelineRunResponse(run_id=run_id, status="pending")
+
+
+@router.post("/run-kubeflow", response_model=PipelineRunResponse)
+async def run_pipeline_kubeflow(
+    request: KubeflowRunRequest,
+    background_tasks: BackgroundTasks,
+) -> PipelineRunResponse:
+    """Compile the pipeline to KFP DSL and submit to a Kubeflow cluster."""
+    run_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        executor.execute_pipeline_kubeflow,
+        run_id,
+        request.dag.model_dump(),
+        request.kubeflow_host,
+        request.experiment_name,
     )
     return PipelineRunResponse(run_id=run_id, status="pending")
 

@@ -37,8 +37,15 @@ class PipelineDAG(BaseModel):
 
 class PipelineRunRequest(BaseModel):
     dag: PipelineDAG
+    env_vars: dict[str, str] = Field(default_factory=dict, description="Extra env vars injected into the pipeline subprocess (e.g. API keys)")
 
 
 class PipelineRunResponse(BaseModel):
     run_id: str
     status: Literal["pending", "running", "success", "failed"]
+
+
+class KubeflowRunRequest(BaseModel):
+    dag: PipelineDAG
+    kubeflow_host: str
+    experiment_name: str = "Default"

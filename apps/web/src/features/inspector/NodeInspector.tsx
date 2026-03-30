@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
-import { CheckCircle2, XCircle, Loader2, Table } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw } from 'lucide-react'
+import { getApiBase } from '../../lib/api'
+import { getNodeIntegrationDefaults } from '../../lib/integrations'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -53,7 +55,7 @@ export function NodeInspector() {
   const testConnection = async () => {
     setConnTest('loading')
     try {
-      const res = await fetch('/api/connectors/test', {
+      const res = await fetch(`${getApiBase()}/connectors/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connector_id: connectorId, config }),
@@ -69,7 +71,7 @@ export function NodeInspector() {
     setPreviewLoading(true)
     setPreview(null)
     try {
-      const res = await fetch('/api/connectors/preview?n_rows=20', {
+      const res = await fetch(`${getApiBase()}/connectors/preview?n_rows=20`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ connector_id: connectorId, config }),
@@ -104,17 +106,48 @@ export function NodeInspector() {
           <p className="text-[11px] text-muted-foreground">{definition.description}</p>
 
           {/* Config form */}
-          {schema.properties &&
-            Object.entries(schema.properties).map(([key, propDef]) => (
-              <FormField
-                key={key}
-                fieldKey={key}
-                schema={propDef as JSONSchema7}
-                required={(schema.required ?? []).includes(key)}
-                value={config[key]}
-                onChange={(v) => handleChange(key, v)}
-              />
-            ))}
+          {schema.properties && (() => {
+            const integrationDefaults = getNodeIntegrationDefaults(node.definitionId)
+            const remoteFields = REMOTE_OPTIONS[node.definitionId] ?? {}
+            return Object.entries(schema.properties).map(([key, propDef]) => {
+              const remoteDef = remoteFields[key]
+              const isFromIntegration = key in integrationDefaults
+              const fieldLabel = (
+                <span className="flex items-center gap-1">
+                  {((propDef as JSONSchema7).title ?? key)}{(schema.required ?? []).includes(key) ? ' *' : ''}
+                  {isFromIntegration && (
+                    <span title="Pre-filled from Integrations settings" className="rounded bg-blue-500/20 px-1 py-0 text-[9px] font-semibold text-blue-400">
+                      integration
+                    </span>
+                  )}
+                </span>
+              )
+              if (remoteDef) {
+                return (
+                  <RemoteOptionsField
+                    key={key}
+                    fieldKey={key}
+                    label={fieldLabel}
+                    value={String(config[key] ?? '')}
+                    config={config}
+                    optionsDef={remoteDef}
+                    onChange={(v) => handleChange(key, v)}
+                  />
+                )
+              }
+              return (
+                <FormField
+                  key={key}
+                  fieldKey={key}
+                  schema={propDef as JSONSchema7}
+                  required={(schema.required ?? []).includes(key)}
+                  value={config[key]}
+                  fromIntegration={isFromIntegration}
+                  onChange={(v) => handleChange(key, v)}
+                />
+              )
+            })
+          })()}
 
           {/* Connector actions (ingest nodes only) */}
           {isIngestNode && (
@@ -213,16 +246,223 @@ export function NodeInspector() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Remote options — live fetch from backend for select-like fields
+// ---------------------------------------------------------------------------
+
+interface RemoteOptionsDef {
+  /** Backend path (without /api prefix). Receives the current node config. */
+  endpoint: (config: Record<string, unknown>) => string | null
+  /** Map one response item to a display label + value */
+  toOption: (item: Record<string, unknown>) => { label: string; value: string }
+  /** Whether to re-fetch when the user types (search mode) vs fetch once */
+  searchMode?: boolean
+}
+
+/**
+ * Maps  definitionId → fieldKey → remote options config.
+ * Only fields listed here get the live-fetch combobox treatment.
+ */
+const REMOTE_OPTIONS: Record<string, Record<string, RemoteOptionsDef>> = {
+  // ── MLflow nodes ──────────────────────────────────────────────────────────
+  'ml.mlflow.set_experiment': {
+    experiment_name: {
+      endpoint: (c) => {
+        const uri = (c.tracking_uri as string) || 'http://localhost:5000'
+        return `/mlflow/experiments?tracking_uri=${encodeURIComponent(uri)}`
+      },
+      toOption: (i) => ({ label: i.name as string, value: i.name as string }),
+    },
+  },
+  'ml.deploy.mlflow': {
+    experiment_name: {
+      endpoint: (c) => {
+        const uri = (c.mlflow_tracking_uri as string) || 'http://localhost:5000'
+        return `/mlflow/experiments?tracking_uri=${encodeURIComponent(uri)}`
+      },
+      toOption: (i) => ({ label: i.name as string, value: i.name as string }),
+    },
+    model_name: {
+      endpoint: (c) => {
+        const uri = (c.mlflow_tracking_uri as string) || 'http://localhost:5000'
+        return `/mlflow/models?tracking_uri=${encodeURIComponent(uri)}`
+      },
+      toOption: (i) => ({ label: i.name as string, value: i.name as string }),
+    },
+  },
+  'ml.mlflow.load_model': {
+    model_name: {
+      endpoint: (c) => {
+        const uri = (c.tracking_uri as string) || 'http://localhost:5000'
+        return `/mlflow/models?tracking_uri=${encodeURIComponent(uri)}`
+      },
+      toOption: (i) => ({ label: i.name as string, value: i.name as string }),
+    },
+  },
+  'ml.mlflow.compare_runs': {
+    experiment_name: {
+      endpoint: (c) => {
+        const uri = (c.tracking_uri as string) || 'http://localhost:5000'
+        return `/mlflow/experiments?tracking_uri=${encodeURIComponent(uri)}`
+      },
+      toOption: (i) => ({ label: i.name as string, value: i.name as string }),
+    },
+  },
+  // ── HuggingFace ingest ────────────────────────────────────────────────────
+  'ml.ingest.huggingface': {
+    dataset_name: {
+      endpoint: (c) => {
+        const q = (c.dataset_name as string) || ''
+        return `/huggingface/datasets?query=${encodeURIComponent(q)}&limit=15`
+      },
+      toOption: (i) => ({ label: i.id as string, value: i.id as string }),
+      searchMode: true,
+    },
+  },
+  // ── HuggingFace embed ─────────────────────────────────────────────────────
+  'llm.embed.huggingface': {
+    model_name: {
+      endpoint: (c) => {
+        const q = (c.model_name as string) || 'sentence-transformers'
+        return `/huggingface/models?query=${encodeURIComponent(q)}&task=feature-extraction&limit=15`
+      },
+      toOption: (i) => ({ label: i.modelId as string, value: i.modelId as string }),
+      searchMode: true,
+    },
+  },
+}
+
+// Shared: all MLflow tracking nodes with experiment_name + tracking_uri
+for (const id of ['ml.mlflow.autolog', 'ml.mlflow.log_params']) {
+  const expDef = REMOTE_OPTIONS['ml.mlflow.set_experiment']?.experiment_name
+  if (expDef) {
+    REMOTE_OPTIONS[id] = { experiment_name: expDef }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteOptionsField — text input with a live-fetched dropdown
+// ---------------------------------------------------------------------------
+
+interface RemoteOptionsFieldProps {
+  label: React.ReactNode
+  fieldKey: string
+  value: string
+  config: Record<string, unknown>
+  optionsDef: RemoteOptionsDef
+  onChange: (v: string) => void
+}
+
+function RemoteOptionsField({ label, value, config, optionsDef, onChange }: RemoteOptionsFieldProps) {
+  const [options, setOptions] = useState<{ label: string; value: string }[]>([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const fetchOptions = useCallback(async (currentConfig: Record<string, unknown>) => {
+    const path = optionsDef.endpoint(currentConfig)
+    if (!path) return
+    setLoading(true)
+    try {
+      const res = await fetch(`${getApiBase()}${path}`)
+      if (!res.ok) return
+      const data = await res.json() as Record<string, unknown>[]
+      setOptions(data.map(optionsDef.toOption))
+    } catch {
+      // silently ignore — network may not be up yet
+    } finally {
+      setLoading(false)
+    }
+  }, [optionsDef])
+
+  // Fetch on mount (non-search mode) or when dependent config changes
+  useEffect(() => {
+    if (!optionsDef.searchMode) {
+      fetchOptions(config)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsDef.searchMode])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleChange = (v: string) => {
+    onChange(v)
+    if (optionsDef.searchMode) {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [Object.keys(config)[0] as string]: v }), 400)
+    }
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="mb-0.5 flex items-center justify-between">
+        <label className="text-[11px] font-medium">{label}</label>
+        {!optionsDef.searchMode && (
+          <button
+            onClick={() => { fetchOptions(config); setOpen(true) }}
+            className="text-muted-foreground hover:text-foreground"
+            title="Refresh options from server"
+          >
+            {loading ? <Loader2 size={9} className="animate-spin" /> : <RefreshCw size={9} />}
+          </button>
+        )}
+      </div>
+      <input
+        type="text"
+        className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        value={String(value ?? '')}
+        placeholder={loading ? 'Loading…' : 'Type or select…'}
+        onFocus={() => { setOpen(true); if (!optionsDef.searchMode && options.length === 0) fetchOptions(config) }}
+        onChange={(e) => { handleChange(e.target.value); setOpen(true) }}
+      />
+      {open && options.length > 0 && (
+        <ul className="absolute z-50 mt-0.5 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+          {options
+            .filter((o) => !value || o.label.toLowerCase().includes(String(value).toLowerCase()))
+            .map((o) => (
+              <li
+                key={o.value}
+                className="cursor-pointer px-2 py-1 text-xs hover:bg-accent"
+                onMouseDown={(e) => { e.preventDefault(); onChange(o.value); setOpen(false) }}
+              >
+                {o.label}
+              </li>
+            ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 interface FormFieldProps {
   fieldKey: string
   schema: JSONSchema7
   required: boolean
   value: unknown
+  fromIntegration?: boolean
   onChange: (v: unknown) => void
 }
 
-function FormField({ fieldKey, schema, required, value, onChange }: FormFieldProps) {
-  const label = (schema.title ?? fieldKey) + (required ? ' *' : '')
+function FormField({ fieldKey, schema, required, value, fromIntegration, onChange }: FormFieldProps) {
+  const baseLabel = (schema.title ?? fieldKey) + (required ? ' *' : '')
+  const label: React.ReactNode = fromIntegration ? (
+    <span className="flex items-center gap-1">
+      {baseLabel}
+      <span title="Pre-filled from Integrations settings" className="rounded bg-blue-500/20 px-1 py-0 text-[9px] font-semibold text-blue-400">
+        integration
+      </span>
+    </span>
+  ) : baseLabel
 
   if (schema.enum) {
     return (
@@ -274,6 +514,11 @@ function FormField({ fieldKey, schema, required, value, onChange }: FormFieldPro
     )
   }
 
+  // file_path fields get a dedicated upload widget
+  if (fieldKey === 'file_path') {
+    return <FilePathField label={label} value={String(value ?? '')} onChange={onChange} />
+  }
+
   const isLong = (schema.description?.length ?? 0) > 40 || fieldKey.includes('prompt') || fieldKey.includes('query')
   return (
     <div>
@@ -295,6 +540,117 @@ function FormField({ fieldKey, schema, required, value, onChange }: FormFieldPro
           onChange={(e) => onChange(e.target.value)}
         />
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// FilePathField — file upload widget for file_path config properties
+// ---------------------------------------------------------------------------
+
+interface FilePathFieldProps {
+  label: React.ReactNode
+  value: string
+  onChange: (v: string) => void
+}
+
+function FilePathField({ label, value, onChange }: FilePathFieldProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadedName, setUploadedName] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // If the value already looks like an uploaded server path, show the filename.
+  const displayName = uploadedName ?? (value ? value.split(/[\\/]/).pop() ?? value : null)
+
+  /** Read a File into an ArrayBuffer, trying arrayBuffer() first and falling
+   *  back to FileReader if the handle has been invalidated (Windows NotFoundError). */
+  const readFile = (file: File): Promise<ArrayBuffer> =>
+    file.arrayBuffer().catch(() =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as ArrayBuffer)
+        reader.onerror = () => reject(reader.error)
+        reader.readAsArrayBuffer(file)
+      })
+    )
+
+  const handleUpload = async (file: File) => {
+    setUploading(true)
+    setError(null)
+    try {
+      const buffer = await readFile(file)
+      const blob = new Blob([buffer], { type: file.type || 'application/octet-stream' })
+      const form = new FormData()
+      form.append('file', blob, file.name)
+      const res = await fetch(`${getApiBase()}/files/upload`, { method: 'POST', body: form })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json() as { server_path: string; filename: string }
+      onChange(data.server_path)
+      setUploadedName(data.filename)
+    } catch (e) {
+      setError(`Upload failed: ${String(e)}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const clearUpload = () => {
+    onChange('')
+    setUploadedName(null)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  return (
+    <div>
+      <label className="mb-0.5 block text-[11px] font-medium">{label}</label>
+
+      {/* Uploaded file badge */}
+      {uploadedName && (
+        <div className="mb-1.5 flex items-center gap-1.5 rounded-md border border-green-500/40 bg-green-500/10 px-2 py-1">
+          <FileCheck size={11} className="shrink-0 text-green-400" />
+          <span className="flex-1 truncate text-[10px] text-green-300">{uploadedName}</span>
+          <button onClick={clearUpload} className="text-muted-foreground hover:text-foreground">
+            <X size={10} />
+          </button>
+        </div>
+      )}
+
+      {/* Manual path input */}
+      <div className="flex gap-1">
+        <input
+          type="text"
+          className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          value={value}
+          placeholder="Path or upload a file →"
+          onChange={(e) => { onChange(e.target.value); setUploadedName(null) }}
+        />
+        <button
+          title="Upload a local file"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.parquet,.tsv,.json,.jsonl,.xlsx,.xls"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) handleUpload(f)
+            e.target.value = ''
+          }}
+        />
+      </div>
+
+      {error && <p className="mt-0.5 text-[10px] text-destructive">{error}</p>}
+      <p className="mt-0.5 text-[10px] text-muted-foreground">
+        Uploaded files are stored server-side and auto-bundled in Docker builds.
+      </p>
     </div>
   )
 }

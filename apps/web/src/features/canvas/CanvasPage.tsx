@@ -12,6 +12,8 @@ import { LogPanel } from './LogPanel'
 import { AgentPanel } from '../agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
 import { Bot, CheckCircle2, XCircle, X } from 'lucide-react'
+import { getApiBase } from '../../lib/api'
+import { getNodeIntegrationDefaults, getIntegrationEnvVars } from '../../lib/integrations'
 
 export function CanvasPage() {
   const { type = 'ml' } = useParams<{ type: string }>()
@@ -24,6 +26,10 @@ export function CanvasPage() {
   const [runError, setRunError] = useState<string | null>(null)
   const [showAgent, setShowAgent] = useState(false)
   const [validateResult, setValidateResult] = useState<PortTypeError[] | null>(null)
+
+  const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
+  const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8888')
+  const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
 
   // Switch pipeline mode when URL changes
   React.useEffect(() => {
@@ -44,7 +50,7 @@ export function CanvasPage() {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dag }),
+        body: JSON.stringify({ dag, env_vars: getIntegrationEnvVars() }),
       })
       if (!res.ok) {
         const text = await res.text()
@@ -62,8 +68,37 @@ export function CanvasPage() {
     }
   }, [dag])
 
-  const handleRun = useCallback(() => startRun('/api/pipeline/run'), [startRun])
-  const handleRunDocker = useCallback(() => startRun('/api/pipeline/run-docker'), [startRun])
+  const handleRun = useCallback(() => startRun(`${getApiBase()}/pipeline/run`), [startRun])
+  const handleRunDocker = useCallback(() => startRun(`${getApiBase()}/pipeline/run-docker`), [startRun])
+  const handleRunInstall = useCallback(() => startRun(`${getApiBase()}/pipeline/run-install`), [startRun])
+  const handleRunDockerInstall = useCallback(() => startRun(`${getApiBase()}/pipeline/run-docker-install`), [startRun])
+  const handleRunKubeflow = useCallback(() => setShowKubeflowDialog(true), [])
+
+  const submitKubeflowRun = useCallback(async () => {
+    setShowKubeflowDialog(false)
+    if (dag.nodes.length === 0) return
+    setRunError(null)
+    dag.nodes.forEach((n) => updateNodeStatus(n.id, 'idle'))
+    try {
+      setIsRunning(true)
+      setShowLogs(true)
+      const res = await fetch(`${getApiBase()}/pipeline/run-kubeflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, experiment_name: kubeflowExperiment, env_vars: getIntegrationEnvVars() }),
+      })
+      if (!res.ok) throw new Error(`Backend error ${res.status}: ${await res.text()}`)
+      const { run_id } = await res.json()
+      setRunId(run_id)
+    } catch (err) {
+      const message = err instanceof TypeError && err.message.includes('fetch')
+        ? 'Cannot reach backend. Start the FastAPI server on port 8000.'
+        : String(err)
+      setRunError(message)
+      setIsRunning(false)
+      setShowLogs(false)
+    }
+  }, [dag, kubeflowHost, kubeflowExperiment, updateNodeStatus])
 
   const handleValidate = useCallback(() => {
     const errors = validatePortTypes(dag, definitionMap)
@@ -85,7 +120,7 @@ export function CanvasPage() {
     if (!runId) return
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/pipeline/${runId}/status`)
+        const res = await fetch(`${getApiBase()}/pipeline/${runId}/status`)
         const { status } = await res.json()
         if (status === 'success' || status === 'error') {
           setIsRunning(false)
@@ -105,7 +140,17 @@ export function CanvasPage() {
 
       {/* Center: Canvas + Code Gen */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <CanvasToolbar onRun={handleRun} onRunDocker={handleRunDocker} onStop={handleStop} onValidate={handleValidate} isRunning={isRunning} />
+        <CanvasToolbar
+          onRun={handleRun}
+          onRunDocker={handleRunDocker}
+          onRunInstall={handleRunInstall}
+          onRunDockerInstall={handleRunDockerInstall}
+          onRunKubeflow={handleRunKubeflow}
+          onStop={handleStop}
+          onValidate={handleValidate}
+          isRunning={isRunning}
+          pipelineType={pipelineType}
+        />
 
         {/* Run error banner */}
         {runError && (
@@ -156,7 +201,10 @@ export function CanvasPage() {
             </TabsList>
           </div>
           <TabsContent value="canvas" className="m-0 flex-1 overflow-hidden relative">
-            <PipelineCanvas definitionMap={definitionMap} />
+            <PipelineCanvas
+              definitionMap={definitionMap}
+              getNodeDefaults={getNodeIntegrationDefaults}
+            />
             {/* Floating AI Agent button */}
             <button
               onClick={() => setShowAgent((v) => !v)}
@@ -187,6 +235,59 @@ export function CanvasPage() {
         <AgentPanel onClose={() => setShowAgent(false)} />
       ) : (
         <NodeInspector />
+      )}
+
+      {/* Kubeflow run dialog */}
+      {showKubeflowDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-[440px] rounded-lg border border-border bg-card p-5 shadow-xl">
+            <h3 className="mb-3 text-sm font-semibold">Submit to Kubeflow Pipelines</h3>
+
+            {/* Setup hint */}
+            <div className="mb-4 rounded border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-[10.5px] text-blue-300/80 space-y-1">
+              <p className="font-medium text-blue-300">Required: port-forward the KFP API service</p>
+              <p className="font-mono text-[10px] text-blue-200/70 select-all">kubectl port-forward svc/ml-pipeline -n kubeflow 8888:8888</p>
+              <p>Then set the host to <span className="font-mono">http://localhost:8888</span> below.</p>
+              <p className="mt-1 text-blue-300/60">If the KFP UI at localhost:8080 shows errors, check pod health:<br />
+                <span className="font-mono text-[10px]">kubectl get pods -n kubeflow</span></p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">KFP API Host URL</label>
+                <input
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  value={kubeflowHost}
+                  onChange={(e) => setKubeflowHost(e.target.value)}
+                  placeholder="http://localhost:8888"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Experiment Name</label>
+                <input
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
+                  value={kubeflowExperiment}
+                  onChange={(e) => setKubeflowExperiment(e.target.value)}
+                  placeholder="Default"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="rounded px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowKubeflowDialog(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                onClick={submitKubeflowRun}
+              >
+                Submit Run
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

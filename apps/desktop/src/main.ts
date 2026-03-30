@@ -1,23 +1,68 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs'
+import * as http from 'http'
 import { spawn, ChildProcess } from 'child_process'
 import { registerFileHandlers } from './ipc/fileHandlers'
 import { registerBackendHandlers } from './ipc/backendHandlers'
 
 app.name = 'Conduit Studio'
 
-// Register app:// as a privileged scheme BEFORE app is ready.
-// This gives it the same security as https:// (CORS, service workers, etc.)
-// so Vite's crossorigin module scripts load correctly in the renderer.
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
-])
-
 const isDev = process.env.NODE_ENV === 'development'
 let mainWindow: BrowserWindow | null = null
 let backendProcess: ChildProcess | null = null
+let webServer: http.Server | null = null
+let webServerPort = 0
+
+// ── Static file server for the bundled web app ───────────────────────────────
+// Serving via http://localhost avoids all file:// CORS / crossorigin issues
+// that cause Vite's ES module scripts to be silently blocked (white/blank page).
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html',
+  '.js':   'application/javascript',
+  '.css':  'text/css',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.ico':  'image/x-icon',
+  '.json': 'application/json',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf':  'font/ttf',
+}
+
+function startWebServer(webRoot: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    webServer = http.createServer((req, res) => {
+      let urlPath = (req.url ?? '/').split('?')[0]
+      // SPA fallback: any path without an extension serves index.html
+      const ext = path.extname(urlPath)
+      if (!ext) urlPath = '/index.html'
+
+      const filePath = path.join(webRoot, urlPath)
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          res.writeHead(404)
+          res.end('Not found')
+          return
+        }
+        const mime = MIME[path.extname(filePath)] ?? 'application/octet-stream'
+        res.writeHead(200, { 'Content-Type': mime })
+        res.end(data)
+      })
+    })
+
+    webServer.listen(0, '127.0.0.1', () => {
+      const addr = webServer!.address() as { port: number }
+      resolve(addr.port)
+    })
+
+    webServer.on('error', reject)
+  })
+}
+
+// ── Backend ───────────────────────────────────────────────────────────────────
 
 function getBackendDir(): string {
   if (isDev) {
@@ -39,13 +84,11 @@ function spawnBackend(): void {
   let cwd: string | undefined
 
   if (isDev) {
-    // Development: run via uv (or fall back to python) from the source tree
     const uvPath = process.platform === 'win32' ? 'uv.exe' : 'uv'
     cmd = uvPath
     args = ['run', 'uvicorn', 'app.main:app', '--port', '8000', '--loop', 'asyncio']
     cwd = backendDir
   } else {
-    // Production: launch the PyInstaller self-contained executable
     const exeName = process.platform === 'win32' ? 'conduit-backend.exe' : 'conduit-backend'
     cmd = path.join(backendDir, exeName)
     args = ['8000']
@@ -60,7 +103,6 @@ function spawnBackend(): void {
 
   backendProcess.on('error', (err) => {
     if (isDev) {
-      // uv not found — fall back to system python
       console.log(`uv spawn failed (${err.message}), falling back to python...`)
       const pythonPath = process.platform === 'win32' ? 'python' : 'python3'
       backendProcess = spawn(pythonPath, ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
@@ -94,12 +136,9 @@ function attachBackendListeners(): void {
   })
 }
 
-async function waitForBackend(
-  url: string,
-  timeoutMs = 60_000,
-  intervalMs = 500,
-): Promise<boolean> {
-  const http = await import('http')
+// ── Health polling ────────────────────────────────────────────────────────────
+
+function waitForBackend(url: string, timeoutMs = 60_000, intervalMs = 500): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   return new Promise((resolve) => {
     const attempt = () => {
@@ -108,24 +147,20 @@ async function waitForBackend(
         resolve(true)
       })
       req.on('error', () => {
-        if (Date.now() < deadline) {
-          setTimeout(attempt, intervalMs)
-        } else {
-          resolve(false)
-        }
+        if (Date.now() < deadline) setTimeout(attempt, intervalMs)
+        else resolve(false)
       })
       req.setTimeout(intervalMs, () => {
         req.destroy()
-        if (Date.now() < deadline) {
-          setTimeout(attempt, intervalMs)
-        } else {
-          resolve(false)
-        }
+        if (Date.now() < deadline) setTimeout(attempt, intervalMs)
+        else resolve(false)
       })
     }
     attempt()
   })
 }
+
+// ── Window ────────────────────────────────────────────────────────────────────
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -145,140 +180,93 @@ function createWindow(): void {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
-    if (isDev) {
-      mainWindow?.webContents.openDevTools()
-    }
+    if (isDev) mainWindow?.webContents.openDevTools()
   })
 
-  mainWindow.on('closed', () => {
-    mainWindow = null
-  })
+  mainWindow.on('closed', () => { mainWindow = null })
 
   if (isDev) {
-    setTimeout(() => {
-      mainWindow?.loadURL('http://localhost:3001')
-    }, 2000)
-  } else {
-    // Poll the backend health endpoint instead of using a fixed delay.
-    // PyInstaller bundles can take 10-30s to extract and start uvicorn.
-    const webAppPath = path.join(process.resourcesPath, 'web', 'index.html')
-
-    // Show a loading screen immediately so the window isn't blank
-    mainWindow.loadURL(`data:text/html,
-      <html><body style="margin:0;background:#0a0a0a;display:flex;align-items:center;
-        justify-content:center;height:100vh;font-family:system-ui;color:#6366f1">
-        <div style="text-align:center">
-          <div style="font-size:22px;font-weight:600;margin-bottom:8px">Conduit Studio</div>
-          <div style="font-size:13px;color:#6b7280">Starting backend server\u2026</div>
-        </div>
-      </body></html>`)
-
-    mainWindow.once('ready-to-show', () => mainWindow?.show())
-
-    waitForBackend('http://localhost:8000/health').then((ready) => {
-      if (!mainWindow) return
-      if (ready) {
-        // Load via app:// (registered custom protocol) so crossorigin ES module
-        // scripts have a real origin and are not blocked by Chromium CORS rules.
-        mainWindow.loadURL('app://web/index.html')
-      } else {
-        mainWindow.loadURL(`data:text/html,
-          <html><body style="margin:0;background:#0a0a0a;display:flex;align-items:center;
-            justify-content:center;height:100vh;font-family:system-ui;color:#ef4444">
-            <div style="text-align:center">
-              <div style="font-size:18px;font-weight:600;margin-bottom:8px">Backend failed to start</div>
-              <div style="font-size:12px;color:#6b7280">Check that port 8000 is not in use and try restarting.</div>
-            </div>
-          </body></html>`)
-      }
-    })
+    setTimeout(() => mainWindow?.loadURL('http://localhost:3001'), 2000)
+    return
   }
+
+  // Show splash immediately
+  mainWindow.loadURL(`data:text/html,<html><body style="margin:0;background:%230a0a0a;
+    display:flex;align-items:center;justify-content:center;height:100vh;
+    font-family:system-ui;color:%236366f1"><div style="text-align:center">
+    <div style="font-size:22px;font-weight:600;margin-bottom:8px">Conduit Studio</div>
+    <div style="font-size:13px;color:%236b7280">Starting\u2026</div>
+    </div></body></html>`)
+
+  waitForBackend('http://localhost:8000/health').then((ready) => {
+    if (!mainWindow) return
+    if (ready) {
+      mainWindow.loadURL(`http://127.0.0.1:${webServerPort}/`)
+    } else {
+      mainWindow.loadURL(`data:text/html,<html><body style="margin:0;background:%230a0a0a;
+        display:flex;align-items:center;justify-content:center;height:100vh;
+        font-family:system-ui;color:%23ef4444"><div style="text-align:center">
+        <div style="font-size:18px;font-weight:600;margin-bottom:8px">Backend failed to start</div>
+        <div style="font-size:12px;color:%236b7280">Check port 8000 is not in use and restart.</div>
+        </div></body></html>`)
+    }
+  })
 }
+
+// ── Auto-updater ──────────────────────────────────────────────────────────────
 
 function setupAutoUpdater(): void {
   if (isDev) return
-
   autoUpdater.checkForUpdatesAndNotify()
-
   autoUpdater.on('update-available', () => {
     dialog.showMessageBox({
-      type: 'info',
-      title: 'Update Available',
+      type: 'info', title: 'Update Available',
       message: 'A new version of Conduit Studio is available. It will be downloaded in the background.',
       buttons: ['OK'],
     })
   })
-
   autoUpdater.on('update-downloaded', () => {
-    dialog
-      .showMessageBox({
-        type: 'question',
-        title: 'Update Ready',
-        message: 'A new version has been downloaded. Restart the application to apply the update.',
-        buttons: ['Restart Now', 'Later'],
-      })
-      .then(({ response }) => {
-        if (response === 0) {
-          autoUpdater.quitAndInstall()
-        }
-      })
+    dialog.showMessageBox({
+      type: 'question', title: 'Update Ready',
+      message: 'A new version has been downloaded. Restart the application to apply the update.',
+      buttons: ['Restart Now', 'Later'],
+    }).then(({ response }) => { if (response === 0) autoUpdater.quitAndInstall() })
   })
-
-  autoUpdater.on('error', (err) => {
-    console.error('Auto-updater error:', err)
-  })
+  autoUpdater.on('error', (err) => console.error('Auto-updater error:', err))
 }
 
 function killBackend(): void {
-  if (backendProcess) {
-    backendProcess.kill()
-    backendProcess = null
-  }
+  if (backendProcess) { backendProcess.kill(); backendProcess = null }
 }
 
-app.whenReady().then(() => {
-  // Serve the bundled web app via app:// so Vite's ES module scripts load
-  // with a real origin instead of the null origin that file:// gives them.
-  // Without this, crossorigin module scripts are silently blocked (white page).
-  if (!isDev) {
-    const webRoot = path.join(process.resourcesPath, 'web')
-    protocol.handle('app', (request) => {
-      const url = new URL(request.url)
-      // url.pathname is e.g. /web/index.html or /web/assets/index.js
-      // Strip the leading /web/ prefix to get the file path within webRoot
-      const relPath = url.pathname.replace(/^\/web\//, '').replace(/^\//, '')
-      const filePath = path.join(webRoot, relPath || 'index.html')
-      return net.fetch(`file://${filePath}`)
-    })
-  }
+// ── App lifecycle ─────────────────────────────────────────────────────────────
 
+app.whenReady().then(async () => {
   registerFileHandlers()
   registerBackendHandlers()
+
+  if (!isDev) {
+    const webRoot = path.join(process.resourcesPath, 'web')
+    webServerPort = await startWebServer(webRoot)
+    console.log(`[web] Serving ${webRoot} on http://127.0.0.1:${webServerPort}`)
+  }
 
   spawnBackend()
   createWindow()
   setupAutoUpdater()
 
   app.on('activate', () => {
-    // On macOS, recreate the window when the dock icon is clicked and no windows are open
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  // On macOS, apps stay active until Cmd+Q is pressed
   if (process.platform !== 'darwin') {
     killBackend()
+    webServer?.close()
     app.quit()
   }
 })
 
-app.on('before-quit', () => {
-  killBackend()
-})
-
-app.on('will-quit', () => {
-  killBackend()
-})
+app.on('before-quit', () => { killBackend(); webServer?.close() })
+app.on('will-quit', () => { killBackend(); webServer?.close() })

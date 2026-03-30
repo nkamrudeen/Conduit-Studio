@@ -7,9 +7,10 @@ import './styles/globals.css'
 // Initialize node registry
 import '@ai-ide/node-registry'
 
-// HashRouter works without a server (Electron uses app:// or file://).
-// BrowserRouter requires a real HTTP server to handle deep-link navigation.
-const isElectron = window.location.protocol === 'file:' || window.location.protocol === 'app:'
+// HashRouter works without a real server for deep-link navigation.
+// Detect Electron via user agent (covers file://, app://, and the new
+// local http static server which all include 'Electron' in the UA).
+const isElectron = navigator.userAgent.includes('Electron')
 const Router = isElectron ? HashRouter : BrowserRouter
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

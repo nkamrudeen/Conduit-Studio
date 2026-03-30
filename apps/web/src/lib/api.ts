@@ -5,9 +5,17 @@
  * - Electron production: the page loads from file://, so relative paths don't reach the
  *   backend.  Return the absolute backend URL directly.
  */
+function isElectron(): boolean {
+  return (
+    window.location.protocol === 'file:' ||
+    window.location.protocol === 'app:' ||
+    // Electron static server serves on a random port — detect via user agent
+    navigator.userAgent.includes('Electron')
+  )
+}
+
 export function getApiBase(): string {
-  const proto = window.location.protocol
-  if (proto === 'file:' || proto === 'app:') {
+  if (isElectron()) {
     // Electron — backend always on localhost:8000
     return 'http://localhost:8000'
   }

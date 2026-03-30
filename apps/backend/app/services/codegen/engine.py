@@ -301,6 +301,57 @@ def generate_snippets(dag: PipelineDAG) -> tuple[list[PipelineNode], list[str], 
     return ordered, snippets, list(dict.fromkeys(all_packages))
 
 
+def save_all(
+    dag: PipelineDAG,
+    ordered: list[PipelineNode],
+    snippets: list[str],
+    packages: list[str],
+    project_folder: str,
+    use_package_layout: bool = False,
+) -> list[str]:
+    """Write all output formats (+ optional package layout) to *project_folder*.
+
+    Returns a sorted list of absolute paths for all files written.
+    """
+    from app.services.codegen import python_gen, notebook_gen, kubeflow_gen, docker_gen, package_gen
+    from pathlib import Path
+
+    root = Path(project_folder).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    written: list[str] = []
+
+    if use_package_layout:
+        written.extend(package_gen.write_package(dag, ordered, snippets, packages, str(root)))
+    else:
+        # Flat pipeline.py
+        code, _ = python_gen.assemble(dag, snippets, packages)
+        p = root / "pipeline.py"
+        p.write_text(code, encoding="utf-8")
+        written.append(str(p))
+
+    # Notebook
+    nb_code, nb_name = notebook_gen.assemble(dag, snippets, packages)
+    nb_path = root / nb_name
+    nb_path.write_text(nb_code, encoding="utf-8")
+    written.append(str(nb_path))
+
+    # Kubeflow DSL
+    kfp_code, kfp_name = kubeflow_gen.assemble(dag, snippets, packages)
+    kfp_path = root / kfp_name
+    kfp_path.write_text(kfp_code, encoding="utf-8")
+    written.append(str(kfp_path))
+
+    # Dockerfile + requirements
+    docker_code, docker_name = docker_gen.assemble(dag, snippets, packages)
+    (root / docker_name).write_text(docker_code, encoding="utf-8")
+    written.append(str(root / docker_name))
+    req_path = root / "requirements.txt"
+    req_path.write_text("\n".join(packages) + "\n", encoding="utf-8")
+    written.append(str(req_path))
+
+    return sorted(written)
+
+
 def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
     from app.services.codegen import python_gen, notebook_gen, kubeflow_gen, docker_gen
 

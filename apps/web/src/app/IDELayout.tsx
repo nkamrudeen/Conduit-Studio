@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { GitBranch, Puzzle, Settings, FlaskConical, Brain, Layers, HelpCircle, X } from 'lucide-react'
+import { FolderTree, GitBranch, Puzzle, Settings, FlaskConical, Brain, Layers, HelpCircle, X } from 'lucide-react'
 import { cn } from '@ai-ide/ui'
 import { IntegrationsPanel } from '../features/integrations/IntegrationsPanel'
 import { SettingsPanel } from '../features/settings/SettingsPanel'
+import { FileBrowserPanel } from '../features/files/FileBrowserPanel'
 
-type SidePanel = 'integrations' | 'settings' | null
+type SidePanel = 'integrations' | 'settings' | 'files' | null
 
 export function IDELayout() {
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
@@ -32,6 +33,16 @@ export function IDELayout() {
         </nav>
 
         <div className="flex items-center gap-2 text-muted-foreground">
+          <button
+            className={cn(
+              'rounded p-1.5 hover:bg-accent hover:text-foreground',
+              sidePanel === 'files' && 'bg-accent text-foreground'
+            )}
+            title="Project Files"
+            onClick={() => togglePanel('files')}
+          >
+            <FolderTree size={15} />
+          </button>
           <button
             className={cn(
               'rounded p-1.5 hover:bg-accent hover:text-foreground',
@@ -68,6 +79,7 @@ export function IDELayout() {
             >
               <X size={13} />
             </button>
+            {sidePanel === 'files' && <FileBrowserPanel />}
             {sidePanel === 'integrations' && <IntegrationsPanel />}
             {sidePanel === 'settings' && <SettingsPanel />}
           </div>

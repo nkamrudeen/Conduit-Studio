@@ -5,6 +5,7 @@ import { ScrollArea, Badge } from '@ai-ide/ui'
 import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { getNodeIntegrationDefaults } from '../../lib/integrations'
+import { useProjectStore } from '../../store/projectStore'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -559,6 +560,7 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadedName, setUploadedName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { projectFolder } = useProjectStore()
 
   // If the value already looks like an uploaded server path, show the filename.
   const displayName = uploadedName ?? (value ? value.split(/[\\/]/).pop() ?? value : null)
@@ -583,6 +585,7 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
       const blob = new Blob([buffer], { type: file.type || 'application/octet-stream' })
       const form = new FormData()
       form.append('file', blob, file.name)
+      if (projectFolder) form.append('project_folder', projectFolder)
       const res = await fetch(`${getApiBase()}/files/upload`, { method: 'POST', body: form })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json() as { server_path: string; filename: string }

@@ -2,7 +2,6 @@
 from __future__ import annotations
 import os
 from typing import Any
-import pandas as pd
 
 from .base import DataConnector
 
@@ -29,6 +28,7 @@ class DatabaseConnector(DataConnector):
                 cols = inspector.get_columns(table)
                 return [{"name": c["name"], "dtype": str(c["type"])} for c in cols]
             # Fall back to querying first row
+            import pandas as pd
             df = pd.read_sql(f"SELECT * FROM ({config['query']}) q LIMIT 1", con=engine)
             return [{"name": col, "dtype": str(dtype)} for col, dtype in df.dtypes.items()]
         finally:
@@ -39,6 +39,7 @@ class DatabaseConnector(DataConnector):
         engine = self._engine(config)
         try:
             query = config.get("query", f"SELECT * FROM {config.get('table', 'table_name')} LIMIT {n_rows}")
+            import pandas as pd
             df = pd.read_sql(query, con=engine)
             return {"columns": df.columns.tolist(), "rows": df.head(n_rows).to_dict("records")}
         finally:

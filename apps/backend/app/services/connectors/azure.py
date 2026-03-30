@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import os
 from typing import Any
-import pandas as pd
 
 from .base import DataConnector
 
@@ -31,7 +30,8 @@ class AzureConnector(DataConnector):
         conn_str = os.environ[config.get("connection_string_env", "AZURE_STORAGE_CONNECTION_STRING")]
         return BlobServiceClient.from_connection_string(conn_str)
 
-    def _read(self, config: dict[str, Any]) -> pd.DataFrame:
+    def _read(self, config: dict[str, Any]):
+        import pandas as pd
         client = self._client(config)
         data = client.get_container_client(config["container"]).download_blob(config["blob_name"]).readall()
         fmt = config.get("file_format", "csv")

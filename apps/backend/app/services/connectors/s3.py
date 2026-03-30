@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import os
 from typing import Any
-import pandas as pd
 
 from .base import DataConnector
 
@@ -34,7 +33,8 @@ class S3Connector(DataConnector):
             session_kwargs["profile_name"] = profile
         return boto3.Session(**session_kwargs).client("s3")
 
-    def _read(self, config: dict[str, Any]) -> pd.DataFrame:
+    def _read(self, config: dict[str, Any]):
+        import pandas as pd
         s3 = self._client(config)
         obj = s3.get_object(Bucket=config["bucket"], Key=config["key"])
         body = obj["Body"].read()

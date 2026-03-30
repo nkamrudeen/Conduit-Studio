@@ -2,7 +2,6 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import pandas as pd
 
 from .base import DataConnector
 
@@ -19,7 +18,8 @@ class LocalConnector(DataConnector):
         df = self._read(config, n_rows=n_rows)
         return {"columns": df.columns.tolist(), "rows": df.to_dict("records")}
 
-    def _read(self, config: dict[str, Any], n_rows: int) -> pd.DataFrame:
+    def _read(self, config: dict[str, Any], n_rows: int):
+        import pandas as pd
         path = Path(config["file_path"])
         nrows = n_rows if n_rows > 0 else None
         match path.suffix.lower():

@@ -2,7 +2,6 @@
 from __future__ import annotations
 import io
 from typing import Any
-import pandas as pd
 
 from .base import DataConnector
 
@@ -25,7 +24,8 @@ class GCSConnector(DataConnector):
         df = self._read(config).head(n_rows)
         return {"columns": df.columns.tolist(), "rows": df.to_dict("records")}
 
-    def _read(self, config: dict[str, Any]) -> pd.DataFrame:
+    def _read(self, config: dict[str, Any]):
+        import pandas as pd
         from google.cloud import storage
         client = storage.Client(project=config.get("project"))
         data = client.bucket(config["bucket"]).blob(config["blob"]).download_as_bytes()

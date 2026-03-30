@@ -4,6 +4,10 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  // './' makes all asset paths relative so the app loads correctly when
+  // opened as a local file:// URL in Electron (absolute paths like /assets/
+  // resolve against the filesystem root, not the web/ folder, causing a blank page).
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

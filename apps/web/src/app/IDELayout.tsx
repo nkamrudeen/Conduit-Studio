@@ -18,7 +18,7 @@ export function IDELayout() {
       {/* Top bar */}
       <header className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-card px-4">
         <div className="flex items-center gap-3">
-          <img src="/icon.svg?v=2" alt="Conduit Studio" className="h-6 w-6" />
+          <img src="./icon.svg" alt="Conduit Studio" className="h-6 w-6" />
           <span className="text-base font-bold text-primary">Conduit Studio</span>
           <span className="text-xs text-muted-foreground">MLOps & LLMOps Visual Pipeline IDE</span>
         </div>

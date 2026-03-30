@@ -27,10 +27,10 @@ export function CodeGenPanel() {
   const [activeFormat, setActiveFormat] = useState<CodeGenFormat>('python')
   const [results, setResults] = useState<Partial<Record<CodeGenFormat, GeneratedCode>>>({})
   const [editedCode, setEditedCode] = useState<Partial<Record<CodeGenFormat, string>>>({})
+  const [savedFormats, setSavedFormats] = useState<Partial<Record<CodeGenFormat, string[]>>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savedFiles, setSavedFiles] = useState<string[]>([])
   const [usePackageLayout, setUsePackageLayout] = useState(false)
 
   const generate = useCallback(async () => {
@@ -38,7 +38,6 @@ export function CodeGenPanel() {
     setEditedCode((prev) => { const next = { ...prev }; delete next[activeFormat]; return next })
     setLoading(true)
     setError(null)
-    setSavedFiles([])
     try {
       const res = await fetch(`${getApiBase()}/codegen/generate`, {
         method: 'POST',
@@ -59,7 +58,6 @@ export function CodeGenPanel() {
     if (!projectFolder || dag.nodes.length === 0) return
     setSaving(true)
     setError(null)
-    setSavedFiles([])
     try {
       const res = await fetch(`${getApiBase()}/codegen/generate`, {
         method: 'POST',
@@ -68,13 +66,15 @@ export function CodeGenPanel() {
           dag,
           format: activeFormat,
           project_folder: projectFolder,
-          use_package_layout: usePackageLayout,
+          use_package_layout: activeFormat === 'python' && usePackageLayout,
         }),
       })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json() as GeneratedCode
       setResults((prev) => ({ ...prev, [activeFormat]: data }))
-      setSavedFiles(data.saved_files ?? [])
+      if (data.saved_files && data.saved_files.length > 0) {
+        setSavedFormats((prev) => ({ ...prev, [activeFormat]: data.saved_files! }))
+      }
     } catch (e) {
       setError(String(e))
     } finally {
@@ -96,11 +96,13 @@ export function CodeGenPanel() {
   }, [results, editedCode, activeFormat])
 
   const current = results[activeFormat]
+  const savedFiles = savedFormats[activeFormat] ?? []
   const monacoLang =
     activeFormat === 'notebook' ? 'json' :
     activeFormat === 'docker' ? 'dockerfile' :
     'python'
   const folderName = projectFolder?.split(/[/\\]/).pop()
+  const formatLabel = FORMATS.find((f) => f.id === activeFormat)?.label ?? activeFormat
 
   return (
     <div className="flex h-full flex-col">
@@ -114,23 +116,28 @@ export function CodeGenPanel() {
                 {editedCode[f.id] !== undefined && (
                   <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-yellow-400" title="Edited" />
                 )}
+                {savedFormats[f.id] && (
+                  <span title="Saved to project"><CheckCircle size={9} className="ml-1 text-green-400" /></span>
+                )}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {/* Package layout toggle */}
-          <label className="flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground select-none">
-            <Package size={11} />
-            <input
-              type="checkbox"
-              checked={usePackageLayout}
-              onChange={(e) => setUsePackageLayout(e.target.checked)}
-              className="accent-primary"
-            />
-            Pkg layout
-          </label>
+          {/* Package layout toggle — only relevant for Python */}
+          {activeFormat === 'python' && (
+            <label className="flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground select-none">
+              <Package size={11} />
+              <input
+                type="checkbox"
+                checked={usePackageLayout}
+                onChange={(e) => setUsePackageLayout(e.target.checked)}
+                className="accent-primary"
+              />
+              Pkg layout
+            </label>
+          )}
 
           {editedCode[activeFormat] !== undefined && (
             <Button size="sm" variant="ghost" className="h-7 text-xs text-yellow-400 hover:text-yellow-300"
@@ -138,6 +145,7 @@ export function CodeGenPanel() {
               Reset
             </Button>
           )}
+
           <Button
             size="sm" variant="outline" className="h-7 text-xs"
             onClick={generate}
@@ -146,18 +154,20 @@ export function CodeGenPanel() {
             {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             Generate
           </Button>
+
           {projectFolder && (
             <Button
               size="sm" variant="outline"
               className="h-7 text-xs text-primary border-primary/40 hover:bg-primary/10"
               onClick={saveToProject}
-              disabled={loading || saving || dag.nodes.length === 0}
-              title={`Save all formats to ${projectFolder}`}
+              disabled={loading || saving || dag.nodes.length === 0 || !current}
+              title={`Save ${formatLabel} to ${projectFolder}`}
             >
               {saving ? <Loader2 size={12} className="animate-spin" /> : <FolderOpen size={12} />}
               Save to {folderName}
             </Button>
           )}
+
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={download} disabled={!current}>
             <Download size={12} />
             Export
@@ -170,7 +180,9 @@ export function CodeGenPanel() {
         <div className="border-b border-border bg-green-950/30 px-3 py-2">
           <div className="flex items-center gap-1.5 text-[11px] text-green-400">
             <CheckCircle size={12} />
-            <span className="font-medium">Saved {savedFiles.length} files to project folder</span>
+            <span className="font-medium">
+              Saved {formatLabel} ({savedFiles.length} {savedFiles.length === 1 ? 'file' : 'files'}) to project folder
+            </span>
           </div>
           <div className="mt-1 space-y-0.5">
             {savedFiles.map((f) => (
@@ -189,10 +201,10 @@ export function CodeGenPanel() {
         ))}
         {!current && !loading && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span>Click Generate to preview the code</span>
+            <span>Click Generate to preview the {formatLabel}</span>
             {projectFolder && (
-              <span className="text-[10px]">
-                or <button onClick={saveToProject} className="text-primary hover:underline">Save to {folderName}</button> to write all formats at once
+              <span className="text-[10px] text-muted-foreground/60">
+                Generate first, then Save to write to {folderName}
               </span>
             )}
           </div>

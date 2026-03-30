@@ -4,7 +4,7 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException
 from app.models.codegen import CodeGenRequest, CodeGenResponse
-from app.services.codegen.engine import generate, generate_snippets, save_all
+from app.services.codegen.engine import generate, generate_snippets, save_format
 
 router = APIRouter()
 
@@ -15,14 +15,14 @@ async def generate_code(request: CodeGenRequest) -> CodeGenResponse:
         result = generate(request.dag, request.format)
 
         if request.project_folder:
-            # Re-run snippet generation (cheap) to get the ordered nodes + snippets
-            # so we can call save_all without duplicating generate()'s internal work.
+            # Re-run snippet generation (cheap) to get ordered nodes + snippets.
             ordered, snippets, packages = await asyncio.to_thread(
                 generate_snippets, request.dag
             )
             saved = await asyncio.to_thread(
-                save_all,
+                save_format,
                 request.dag,
+                request.format,
                 ordered,
                 snippets,
                 packages,

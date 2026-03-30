@@ -28,7 +28,7 @@ export function CanvasPage() {
   const [validateResult, setValidateResult] = useState<PortTypeError[] | null>(null)
 
   const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
-  const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
+  const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8888')
   const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
 
   // Switch pipeline mode when URL changes
@@ -240,16 +240,26 @@ export function CanvasPage() {
       {/* Kubeflow run dialog */}
       {showKubeflowDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-96 rounded-lg border border-border bg-card p-5 shadow-xl">
-            <h3 className="mb-4 text-sm font-semibold">Submit to Kubeflow Pipelines</h3>
+          <div className="w-[440px] rounded-lg border border-border bg-card p-5 shadow-xl">
+            <h3 className="mb-3 text-sm font-semibold">Submit to Kubeflow Pipelines</h3>
+
+            {/* Setup hint */}
+            <div className="mb-4 rounded border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-[10.5px] text-blue-300/80 space-y-1">
+              <p className="font-medium text-blue-300">Required: port-forward the KFP API service</p>
+              <p className="font-mono text-[10px] text-blue-200/70 select-all">kubectl port-forward svc/ml-pipeline -n kubeflow 8888:8888</p>
+              <p>Then set the host to <span className="font-mono">http://localhost:8888</span> below.</p>
+              <p className="mt-1 text-blue-300/60">If the KFP UI at localhost:8080 shows errors, check pod health:<br />
+                <span className="font-mono text-[10px]">kubectl get pods -n kubeflow</span></p>
+            </div>
+
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">KFP Host URL</label>
+                <label className="mb-1 block text-xs text-muted-foreground">KFP API Host URL</label>
                 <input
                   className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
                   value={kubeflowHost}
                   onChange={(e) => setKubeflowHost(e.target.value)}
-                  placeholder="http://localhost:8080"
+                  placeholder="http://localhost:8888"
                 />
               </div>
               <div>

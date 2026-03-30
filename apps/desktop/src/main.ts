@@ -87,6 +87,39 @@ function attachBackendListeners(): void {
   })
 }
 
+async function waitForBackend(
+  url: string,
+  timeoutMs = 60_000,
+  intervalMs = 500,
+): Promise<boolean> {
+  const http = await import('http')
+  const deadline = Date.now() + timeoutMs
+  return new Promise((resolve) => {
+    const attempt = () => {
+      const req = http.get(url, (res) => {
+        res.resume()
+        resolve(true)
+      })
+      req.on('error', () => {
+        if (Date.now() < deadline) {
+          setTimeout(attempt, intervalMs)
+        } else {
+          resolve(false)
+        }
+      })
+      req.setTimeout(intervalMs, () => {
+        req.destroy()
+        if (Date.now() < deadline) {
+          setTimeout(attempt, intervalMs)
+        } else {
+          resolve(false)
+        }
+      })
+    }
+    attempt()
+  })
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -119,13 +152,37 @@ function createWindow(): void {
       mainWindow?.loadURL('http://localhost:3001')
     }, 2000)
   } else {
-    // Wait for backend to be ready before loading the app.
-    // In the packaged asar, __dirname = resources/app.asar/dist/
-    // The web dist is bundled as an extraResource at resources/web/
-    setTimeout(() => {
-      const webAppPath = path.join(process.resourcesPath, 'web', 'index.html')
-      mainWindow?.loadFile(webAppPath)
-    }, 2000)
+    // Poll the backend health endpoint instead of using a fixed delay.
+    // PyInstaller bundles can take 10-30s to extract and start uvicorn.
+    const webAppPath = path.join(process.resourcesPath, 'web', 'index.html')
+
+    // Show a loading screen immediately so the window isn't blank
+    mainWindow.loadURL(`data:text/html,
+      <html><body style="margin:0;background:#0a0a0a;display:flex;align-items:center;
+        justify-content:center;height:100vh;font-family:system-ui;color:#6366f1">
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:600;margin-bottom:8px">Conduit Studio</div>
+          <div style="font-size:13px;color:#6b7280">Starting backend server…</div>
+        </div>
+      </body></html>`)
+
+    mainWindow.once('ready-to-show', () => mainWindow?.show())
+
+    waitForBackend('http://localhost:8000/health').then((ready) => {
+      if (!mainWindow) return
+      if (ready) {
+        mainWindow.loadFile(webAppPath)
+      } else {
+        mainWindow.loadURL(`data:text/html,
+          <html><body style="margin:0;background:#0a0a0a;display:flex;align-items:center;
+            justify-content:center;height:100vh;font-family:system-ui;color:#ef4444">
+            <div style="text-align:center">
+              <div style="font-size:18px;font-weight:600;margin-bottom:8px">Backend failed to start</div>
+              <div style="font-size:12px;color:#6b7280">Check that port 8000 is not in use and try restarting.</div>
+            </div>
+          </body></html>`)
+      }
+    })
   }
 }
 

@@ -148,20 +148,31 @@ def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = No
 
 
 def _get_docker_host_ip() -> str:
-    """Return the IP address containers should use to reach the host.
+    """Return the host identifier that containers should use to reach the host.
 
-    MLflow (and many other servers) perform DNS-rebinding protection by
-    rejecting requests whose ``Host`` header is a hostname rather than an
-    IP address.  Using ``host.docker.internal`` triggers this check because
-    the HTTP client sends ``Host: host.docker.internal`` which the server
-    rejects with 403.  Using the actual IP sidesteps the check entirely.
+    On Docker Desktop (Windows / Mac) containers run inside a Linux VM, so
+    the conventional Linux bridge gateway (172.17.0.1) is the VM's own
+    bridge — NOT the Windows/Mac host.  Docker Desktop injects
+    ``host.docker.internal`` into every container's /etc/hosts pointing at
+    the real host, so we return that sentinel on non-Linux platforms.
 
-    Strategy (in priority order):
-    1. Ask Docker for the bridge-network gateway (authoritative on Linux).
-    2. Resolve ``host.docker.internal`` from the *host* side (Docker Desktop).
-    3. Fall back to the conventional Linux bridge default ``172.17.0.1``.
+    The MLflow templates resolve ``host.docker.internal`` to an IP *inside
+    the container* at runtime, which bypasses MLflow's DNS-rebinding check
+    (it only rejects hostname Host: headers, not IP-based ones).
+
+    Strategy:
+    1. Non-Linux host (Docker Desktop) → return ``host.docker.internal``
+       so the container resolves it correctly at runtime.
+    2. Linux host → ask Docker for the bridge-network gateway (authoritative).
+    3. Linux fallback → conventional bridge default ``172.17.0.1``.
     """
-    # 1. Docker bridge gateway — works on Linux Docker Engine
+    import platform
+    if platform.system() != "Linux":
+        # Docker Desktop on Windows/Mac: containers resolve host.docker.internal
+        # to the real host IP via /etc/hosts injected by Docker Desktop.
+        return "host.docker.internal"
+
+    # Linux Docker Engine: bridge gateway is the correct host-reachable IP.
     try:
         result = subprocess.run(
             [
@@ -179,16 +190,6 @@ def _get_docker_host_ip() -> str:
     except Exception:
         pass
 
-    # 2. Resolve host.docker.internal on the host (Docker Desktop Mac/Windows)
-    try:
-        import socket
-        ip = socket.gethostbyname("host.docker.internal")
-        if ip:
-            return ip
-    except Exception:
-        pass
-
-    # 3. Conventional Docker bridge gateway fallback
     return "172.17.0.1"
 
 
@@ -474,7 +475,11 @@ async def execute_pipeline_docker(run_id: str, dag: dict[str, Any]) -> None:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
         run_rc = await _stream_subprocess(
-            [docker_exe, "run", "--rm", image_tag],
+            [docker_exe, "run", "--rm",
+             "--add-host=host.docker.internal:host-gateway",
+             "-e", "MLFLOW_HTTP_REQUEST_MAX_RETRIES=0",
+             "-e", "MLFLOW_HTTP_REQUEST_TIMEOUT=5",
+             image_tag],
             _on_run_line,
         )
 
@@ -749,7 +754,11 @@ async def execute_pipeline_docker_with_install(run_id: str, dag: dict[str, Any])
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 
         run_rc = await _stream_subprocess(
-            [docker_exe, "run", "--rm", image_tag],
+            [docker_exe, "run", "--rm",
+             "--add-host=host.docker.internal:host-gateway",
+             "-e", "MLFLOW_HTTP_REQUEST_MAX_RETRIES=0",
+             "-e", "MLFLOW_HTTP_REQUEST_TIMEOUT=5",
+             image_tag],
             _on_run_line,
         )
 

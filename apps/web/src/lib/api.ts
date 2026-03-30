@@ -6,7 +6,8 @@
  *   backend.  Return the absolute backend URL directly.
  */
 export function getApiBase(): string {
-  if (window.location.protocol === 'file:') {
+  const proto = window.location.protocol
+  if (proto === 'file:' || proto === 'app:') {
     // Electron — backend always on localhost:8000
     return 'http://localhost:8000'
   }

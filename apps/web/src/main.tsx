@@ -7,8 +7,10 @@ import './styles/globals.css'
 // Initialize node registry
 import '@ai-ide/node-registry'
 
-// HashRouter works with file:// (Electron) — BrowserRouter requires a server.
-const Router = window.location.protocol === 'file:' ? HashRouter : BrowserRouter
+// HashRouter works without a server (Electron uses app:// or file://).
+// BrowserRouter requires a real HTTP server to handle deep-link navigation.
+const isElectron = window.location.protocol === 'file:' || window.location.protocol === 'app:'
+const Router = isElectron ? HashRouter : BrowserRouter
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

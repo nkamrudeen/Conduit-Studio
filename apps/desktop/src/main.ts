@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs'
@@ -7,6 +7,13 @@ import { registerFileHandlers } from './ipc/fileHandlers'
 import { registerBackendHandlers } from './ipc/backendHandlers'
 
 app.name = 'Conduit Studio'
+
+// Register app:// as a privileged scheme BEFORE app is ready.
+// This gives it the same security as https:// (CORS, service workers, etc.)
+// so Vite's crossorigin module scripts load correctly in the renderer.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+])
 
 const isDev = process.env.NODE_ENV === 'development'
 let mainWindow: BrowserWindow | null = null
@@ -162,7 +169,7 @@ function createWindow(): void {
         justify-content:center;height:100vh;font-family:system-ui;color:#6366f1">
         <div style="text-align:center">
           <div style="font-size:22px;font-weight:600;margin-bottom:8px">Conduit Studio</div>
-          <div style="font-size:13px;color:#6b7280">Starting backend server…</div>
+          <div style="font-size:13px;color:#6b7280">Starting backend server\u2026</div>
         </div>
       </body></html>`)
 
@@ -171,7 +178,9 @@ function createWindow(): void {
     waitForBackend('http://localhost:8000/health').then((ready) => {
       if (!mainWindow) return
       if (ready) {
-        mainWindow.loadFile(webAppPath)
+        // Load via app:// (registered custom protocol) so crossorigin ES module
+        // scripts have a real origin and are not blocked by Chromium CORS rules.
+        mainWindow.loadURL('app://web/index.html')
       } else {
         mainWindow.loadURL(`data:text/html,
           <html><body style="margin:0;background:#0a0a0a;display:flex;align-items:center;
@@ -228,6 +237,21 @@ function killBackend(): void {
 }
 
 app.whenReady().then(() => {
+  // Serve the bundled web app via app:// so Vite's ES module scripts load
+  // with a real origin instead of the null origin that file:// gives them.
+  // Without this, crossorigin module scripts are silently blocked (white page).
+  if (!isDev) {
+    const webRoot = path.join(process.resourcesPath, 'web')
+    protocol.handle('app', (request) => {
+      const url = new URL(request.url)
+      // url.pathname is e.g. /web/index.html or /web/assets/index.js
+      // Strip the leading /web/ prefix to get the file path within webRoot
+      const relPath = url.pathname.replace(/^\/web\//, '').replace(/^\//, '')
+      const filePath = path.join(webRoot, relPath || 'index.html')
+      return net.fetch(`file://${filePath}`)
+    })
+  }
+
   registerFileHandlers()
   registerBackendHandlers()
 

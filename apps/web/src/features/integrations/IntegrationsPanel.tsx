@@ -49,7 +49,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
         label: 'Bearer Token (if auth enabled)',
         placeholder: 'Paste token here…',
         type: 'password',
-        hint: 'kubectl -n kubeflow create token default-editor',
+        hint: 'kubectl -n kubeflow create token default || kubectl -n kubeflow get sa',
       },
     ],
     testEndpoint: '/integrations/test/kubeflow',
@@ -153,8 +153,8 @@ interface ConnectionStatus {
   message?: string
 }
 
-// Small copyable code snippet component
-function CopyHint({ text }: { text: string }) {
+// Copyable command line
+function CopyLine({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
     navigator.clipboard.writeText(text).then(() => {
@@ -163,15 +163,37 @@ function CopyHint({ text }: { text: string }) {
     })
   }
   return (
-    <div className="mt-1 flex items-center gap-1.5 rounded border border-border bg-muted/40 px-2 py-1">
+    <div className="flex items-center gap-1.5 rounded border border-border bg-muted/40 px-2 py-1">
       <code className="flex-1 select-all font-mono text-[10px] text-muted-foreground">{text}</code>
-      <button
-        onClick={copy}
-        className="shrink-0 text-muted-foreground hover:text-foreground"
-        title="Copy to clipboard"
-      >
+      <button onClick={copy} className="shrink-0 text-muted-foreground hover:text-foreground" title="Copy">
         {copied ? <Check size={11} className="text-green-400" /> : <Copy size={11} />}
       </button>
+    </div>
+  )
+}
+
+// Multi-step hint block — shows labelled copyable commands
+function CopyHint({ text }: { text: string }) {
+  // If text contains " || " treat as multi-step hints separated by that delimiter
+  const steps = text.split(' || ')
+  if (steps.length === 1) return <div className="mt-1"><CopyLine text={text} /></div>
+
+  const labels = [
+    '1. Try with default service account:',
+    '2. Or list available service accounts:',
+  ]
+  return (
+    <div className="mt-1.5 space-y-1 rounded border border-border bg-muted/30 p-2">
+      <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Get a token</p>
+      {steps.map((cmd, i) => (
+        <div key={i}>
+          {labels[i] && <p className="text-[9px] text-muted-foreground mb-0.5">{labels[i]}</p>}
+          <CopyLine text={cmd.trim()} />
+        </div>
+      ))}
+      <p className="text-[9px] text-muted-foreground mt-1">
+        Replace <code className="font-mono">default</code> with the service account name from step 2 if step 1 fails.
+      </p>
     </div>
   )
 }

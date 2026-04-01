@@ -21,7 +21,7 @@ export function IDELayout() {
         <div className="flex items-center gap-3">
           <ConduitLogo className="h-6 w-6" />
           <span className="text-base font-bold text-primary">ConduitCraft AI</span>
-          <span className="text-xs text-muted-foreground">MLOps & LLMOps Visual Pipeline IDE by ConduitCraft</span>
+          <span className="text-xs text-muted-foreground italic">Craft Your Pipelines. Ship Your Models.</span>
         </div>
 
         <nav className="flex items-center gap-1">

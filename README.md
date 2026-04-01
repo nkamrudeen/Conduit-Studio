@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <strong>Craft Your Pipelines. Ship Your Models.</strong>
+</p>
+
+<p align="center">
   Open-source drag-and-drop IDE for building ML and LLM pipelines.<br/>
   Compose pipelines as flowcharts — ConduitCraft AI generates executable Python scripts,<br/>
   Jupyter notebooks, Kubeflow DSL, and Dockerfiles from the visual flow.

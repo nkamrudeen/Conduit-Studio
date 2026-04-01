@@ -12,6 +12,7 @@ DELETE /files/{file_id}       — delete an uploaded file
 from __future__ import annotations
 
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -21,11 +22,16 @@ from fastapi import File as FastAPIFile
 router = APIRouter(tags=["files"])
 
 # ---------------------------------------------------------------------------
-# Uploads directory — sits alongside the backend package root
+# Uploads directory
 # ---------------------------------------------------------------------------
-# apps/backend/app/routers/files.py  →  ../../../uploads  = apps/backend/uploads/
-UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
-UPLOADS_DIR.mkdir(exist_ok=True)
+# When frozen by PyInstaller, __file__ resolves inside the read-only MEIPASS
+# temp dir.  Use the directory that contains the executable instead so we
+# always write to a user-writable location.
+if getattr(sys, 'frozen', False):
+    UPLOADS_DIR = Path(sys.executable).parent / "uploads"
+else:
+    UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _find_upload(file_id: str) -> Path | None:

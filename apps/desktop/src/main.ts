@@ -92,7 +92,7 @@ function spawnBackend(): void {
     const exeName = process.platform === 'win32' ? 'conduit-backend.exe' : 'conduit-backend'
     cmd = path.join(backendDir, exeName)
     args = ['8000']
-    cwd = undefined
+    cwd = backendDir   // must run from its own dir so relative data files resolve
   }
 
   backendProcess = spawn(cmd, args, {
@@ -163,12 +163,17 @@ function waitForBackend(url: string, timeoutMs = 60_000, intervalMs = 500): Prom
 // ── Window ────────────────────────────────────────────────────────────────────
 
 function createWindow(): void {
+  const iconPath = isDev
+    ? path.join(__dirname, '..', 'assets', 'icon.ico')
+    : path.join(__dirname, '..', 'assets', 'icon.ico')
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 600,
     show: false,
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

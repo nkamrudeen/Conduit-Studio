@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Check, X, Loader2, ExternalLink } from 'lucide-react'
 import { Button, Input, ScrollArea } from '@ai-ide/ui'
+import { getApiBase } from '../../lib/api'
 
 interface IntegrationConfig {
   label: string
@@ -14,6 +15,7 @@ interface IntegrationConfig {
     envVar?: string
   }[]
   testEndpoint?: string
+  testParams?: (cfg: Record<string, string>) => Record<string, string | undefined>
   docsUrl?: string
 }
 
@@ -27,7 +29,8 @@ const INTEGRATIONS: IntegrationConfig[] = [
       { key: 'experiment_name', label: 'Default Experiment Name', placeholder: 'my_experiment' },
       { key: 'artifact_root', label: 'Artifact Root (optional)', placeholder: 'mlflow-artifacts:/' },
     ],
-    testEndpoint: '/api/mlflow/experiments',
+    testEndpoint: '/integrations/test/mlflow',
+    testParams: (cfg) => ({ tracking_uri: cfg['tracking_uri'] }),
     docsUrl: 'https://mlflow.org/docs/latest/tracking.html',
   },
   {
@@ -39,7 +42,8 @@ const INTEGRATIONS: IntegrationConfig[] = [
       { key: 'namespace', label: 'Namespace', placeholder: 'kubeflow' },
       { key: 'token', label: 'Bearer Token (if auth enabled)', placeholder: 'kubectl -n kubeflow create token default-editor', type: 'password' },
     ],
-    testEndpoint: '/api/kubeflow/pipelines',
+    testEndpoint: '/integrations/test/kubeflow',
+    testParams: (cfg) => ({ host: cfg['host'], token: cfg['token'] }),
     docsUrl: 'https://www.kubeflow.org/docs/components/pipelines/',
   },
   {
@@ -51,6 +55,8 @@ const INTEGRATIONS: IntegrationConfig[] = [
       { key: 'username', label: 'Username (for repo_id prefix)', placeholder: 'your-hf-username' },
       { key: 'cache_dir', label: 'Local Cache Dir (optional)', placeholder: '~/.cache/huggingface' },
     ],
+    testEndpoint: '/integrations/test/huggingface',
+    testParams: (cfg) => ({ token: cfg['token'] }),
     docsUrl: 'https://huggingface.co/docs/hub/security-tokens',
   },
   {
@@ -62,6 +68,8 @@ const INTEGRATIONS: IntegrationConfig[] = [
       { key: 'base_url', label: 'Base URL (optional)', placeholder: 'https://api.openai.com/v1', type: 'url' },
       { key: 'org_id', label: 'Organization ID (optional)', placeholder: 'org-...' },
     ],
+    testEndpoint: '/integrations/test/openai',
+    testParams: (cfg) => ({ api_key: cfg['api_key'], base_url: cfg['base_url'] }),
     docsUrl: 'https://platform.openai.com/api-keys',
   },
   {
@@ -71,6 +79,8 @@ const INTEGRATIONS: IntegrationConfig[] = [
     fields: [
       { key: 'api_key', label: 'API Key', placeholder: 'sk-ant-...', type: 'password', envVar: 'ANTHROPIC_API_KEY' },
     ],
+    testEndpoint: '/integrations/test/anthropic',
+    testParams: (cfg) => ({ api_key: cfg['api_key'] }),
     docsUrl: 'https://docs.anthropic.com/claude/reference/getting-started-with-the-api',
   },
   {
@@ -83,6 +93,13 @@ const INTEGRATIONS: IntegrationConfig[] = [
       { key: 'aws_region', label: 'Default Region', placeholder: 'us-east-1' },
       { key: 'default_bucket', label: 'Default Bucket (optional)', placeholder: 'my-ml-bucket' },
     ],
+    testEndpoint: '/integrations/test/s3',
+    testParams: (cfg) => ({
+      aws_access_key_id: cfg['aws_access_key_id'],
+      aws_secret_access_key: cfg['aws_secret_access_key'],
+      aws_region: cfg['aws_region'],
+      default_bucket: cfg['default_bucket'],
+    }),
     docsUrl: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html',
   },
 ]
@@ -128,14 +145,19 @@ export function IntegrationsPanel() {
     if (!integration.testEndpoint) return
     setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'testing' } }))
     try {
-      const config = configs[integration.label] ?? {}
-      const params = new URLSearchParams(config).toString()
-      const res = await fetch(`${integration.testEndpoint}?${params}`)
-      if (res.ok) {
-        setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'ok', message: 'Connected' } }))
+      const cfg = configs[integration.label] ?? {}
+      const raw = integration.testParams ? integration.testParams(cfg) : cfg
+      const params = new URLSearchParams(
+        Object.fromEntries(Object.entries(raw).filter(([, v]) => v != null && v !== '')) as Record<string, string>
+      ).toString()
+      const url = `${getApiBase()}${integration.testEndpoint}${params ? `?${params}` : ''}`
+      const res = await fetch(url)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) {
+        setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'ok', message: data.message ?? 'Connected' } }))
       } else {
-        const text = await res.text()
-        setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'error', message: text.slice(0, 120) } }))
+        const msg = data.detail ?? data.message ?? JSON.stringify(data)
+        setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'error', message: String(msg).slice(0, 200) } }))
       }
     } catch (err) {
       setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'error', message: String(err) } }))

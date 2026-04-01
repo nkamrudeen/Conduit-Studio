@@ -127,7 +127,7 @@ function buildDefaults(): Record<string, Record<string, string>> {
   return out
 }
 
-const STORAGE_KEY = 'aiide:integrations'
+const STORAGE_KEY = 'conduitcraft:integrations'
 
 function loadConfig(): Record<string, Record<string, string>> {
   const defaults = buildDefaults()

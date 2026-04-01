@@ -40,7 +40,7 @@ const sections: Section[] = [
     title: 'Getting Started',
     content: (
       <div className="space-y-3">
-        <p>Conduit Studio is a visual drag-and-drop IDE for building ML and LLM pipelines. You compose a pipeline as a flowchart and the IDE generates executable Python code from it.</p>
+        <p>ConduitCraft AI is a visual drag-and-drop IDE for building ML and LLM pipelines. You compose a pipeline as a flowchart and the IDE generates executable Python code from it.</p>
         <ol className="space-y-2 list-none">
           {[
             ['Pick a pipeline mode', 'Choose ML Pipeline (scikit-learn, XGBoost, PyTorch…) or LLM Pipeline (RAG, fine-tuning, agents…) from the top nav.'],
@@ -300,11 +300,11 @@ const sections: Section[] = [
     title: 'Plugin System',
     content: (
       <div className="space-y-3 text-[11px]">
-        <p>Plugins extend Conduit Studio with custom node types and connectors without modifying the core codebase.</p>
+        <p>Plugins extend ConduitCraft AI with custom node types and connectors without modifying the core codebase.</p>
         <div className="space-y-2">
           <div className="rounded border border-border p-2 space-y-1">
             <p className="font-semibold text-foreground">Installing a plugin</p>
-            <p className="text-muted-foreground">Copy the plugin folder to <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">~/.conduit/plugins/</code> and restart the backend. The plugin's nodes appear automatically in the palette.</p>
+            <p className="text-muted-foreground">Copy the plugin folder to <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">~/.conduitcraft/plugins/</code> and restart the backend. The plugin's nodes appear automatically in the palette.</p>
           </div>
           <div className="rounded border border-border p-2 space-y-1">
             <p className="font-semibold text-foreground">plugin.manifest.json</p>

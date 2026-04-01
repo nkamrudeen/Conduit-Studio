@@ -7,7 +7,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { registerFileHandlers } from './ipc/fileHandlers'
 import { registerBackendHandlers } from './ipc/backendHandlers'
 
-app.name = 'Conduit Studio'
+app.name = 'ConduitCraft AI'
 
 const isDev = process.env.NODE_ENV === 'development'
 let mainWindow: BrowserWindow | null = null
@@ -194,7 +194,7 @@ function createWindow(): void {
   mainWindow.loadURL(`data:text/html,<html><body style="margin:0;background:%230a0a0a;
     display:flex;align-items:center;justify-content:center;height:100vh;
     font-family:system-ui;color:%236366f1"><div style="text-align:center">
-    <div style="font-size:22px;font-weight:600;margin-bottom:8px">Conduit Studio</div>
+    <div style="font-size:22px;font-weight:600;margin-bottom:8px">ConduitCraft AI</div>
     <div style="font-size:13px;color:%236b7280">Starting\u2026</div>
     </div></body></html>`)
 
@@ -221,7 +221,7 @@ function setupAutoUpdater(): void {
   autoUpdater.on('update-available', () => {
     dialog.showMessageBox({
       type: 'info', title: 'Update Available',
-      message: 'A new version of Conduit Studio is available. It will be downloaded in the background.',
+      message: 'A new version of ConduitCraft AI is available. It will be downloaded in the background.',
       buttons: ['OK'],
     })
   })

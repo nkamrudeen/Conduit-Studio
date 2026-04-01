@@ -1,15 +1,15 @@
 """
-Conduit Studio MCP Server.
+ConduitCraft AI MCP Server.
 
 Exposes pipeline execution tools via the Model Context Protocol (MCP),
 allowing Claude Code (or any MCP client) to install packages and run
-Conduit Studio pipelines directly.
+ConduitCraft AI pipelines directly.
 
 Usage:
   uv run python mcp_server.py            # stdio transport (Claude Code)
 
 Add to Claude Code:
-  claude mcp add conduit-studio -- uv run python apps/backend/mcp_server.py
+  claude mcp add conduitcraft-ai -- uv run python apps/backend/mcp_server.py
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ except ImportError:
     )
     sys.exit(1)
 
-mcp = FastMCP("Conduit Studio")
+mcp = FastMCP("ConduitCraft AI")
 
 
 # ---------------------------------------------------------------------------

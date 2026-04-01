@@ -14,6 +14,6 @@ export const useProjectStore = create<ProjectState>()(
       setProjectFolder: (path) => set({ projectFolder: path }),
       clearProjectFolder: () => set({ projectFolder: null }),
     }),
-    { name: 'conduit:project' },
+    { name: 'conduitcraft:project' },
   ),
 )

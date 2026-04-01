@@ -19,9 +19,9 @@ export function IDELayout() {
       {/* Top bar */}
       <header className="flex h-10 shrink-0 items-center justify-between border-b border-border bg-card px-4">
         <div className="flex items-center gap-3">
-          <img src="./icon.svg" alt="Conduit Studio" className="h-6 w-6" />
-          <span className="text-base font-bold text-primary">Conduit Studio</span>
-          <span className="text-xs text-muted-foreground">MLOps & LLMOps Visual Pipeline IDE</span>
+          <ConduitLogo className="h-6 w-6" />
+          <span className="text-base font-bold text-primary">ConduitCraft AI</span>
+          <span className="text-xs text-muted-foreground">MLOps & LLMOps Visual Pipeline IDE by ConduitCraft</span>
         </div>
 
         <nav className="flex items-center gap-1">
@@ -86,6 +86,42 @@ export function IDELayout() {
         )}
       </div>
     </div>
+  )
+}
+
+function ConduitLogo({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" className={className}>
+      <defs>
+        <linearGradient id="cshex" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#c026d3"/>
+          <stop offset="50%" stopColor="#7c3aed"/>
+          <stop offset="100%" stopColor="#0891b2"/>
+        </linearGradient>
+        <filter id="csneon" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur1"/>
+          <feColorMatrix in="blur1" type="matrix"
+            values="0 0 0 0 0.8 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0" result="glow1"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="blur2"/>
+          <feMerge>
+            <feMergeNode in="glow1"/>
+            <feMergeNode in="blur2"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <filter id="csdot" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <polygon points="16,2.5 27,8.8 27,23.2 16,29.5 5,23.2 5,8.8" fill="url(#cshex)" filter="url(#csneon)"/>
+      <polygon points="16,5.5 24.2,10.2 24.2,21.8 16,26.5 7.8,21.8 7.8,10.2" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="0.6"/>
+      <line x1="13" y1="15.8" x2="14.3" y2="12.5" stroke="#e879f9" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="17.7" y1="12.5" x2="19" y2="15.8" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="10.8" cy="17.2" r="2.6" fill="#f0abfc" filter="url(#csdot)"/>
+      <circle cx="16"   cy="11.2" r="2.6" fill="#fde68a" filter="url(#csdot)"/>
+      <circle cx="21.2" cy="17.2" r="2.6" fill="#67e8f9" filter="url(#csdot)"/>
+    </svg>
   )
 }
 

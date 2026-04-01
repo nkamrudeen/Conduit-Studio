@@ -4,8 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import pipeline, codegen, connectors, mlflow, kubeflow, huggingface, agent, files, project
 
 app = FastAPI(
-    title="Conduit Studio Backend",
-    description="Execution engine, code generator, and data connectors for Conduit Studio",
+    title="ConduitCraft AI Backend",
+    description="Execution engine, code generator, and data connectors for ConduitCraft AI",
     version="0.1.0",
 )
 

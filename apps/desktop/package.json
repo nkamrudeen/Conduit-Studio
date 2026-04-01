@@ -2,7 +2,7 @@
   "name": "@ai-ide/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Conduit Studio Desktop App",
+  "description": "ConduitCraft AI Desktop App",
   "main": "dist/main.js",
   "scripts": {
     "dev": "concurrently \"tsc --watch\" \"electron .\"",

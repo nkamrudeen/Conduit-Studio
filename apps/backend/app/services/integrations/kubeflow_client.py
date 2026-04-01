@@ -6,7 +6,7 @@ from __future__ import annotations
 _KFP_TIMEOUT = 15
 
 
-def _get_kfp_client(host: str):
+def _get_kfp_client(host: str, token: str = ""):
     try:
         import kfp  # noqa: PLC0415
     except ImportError as exc:
@@ -14,7 +14,10 @@ def _get_kfp_client(host: str):
             "kfp is not installed. Install it with: pip install kfp"
         ) from exc
     try:
-        return kfp.Client(host=host)
+        kwargs: dict = {"host": host}
+        if token:
+            kwargs["existing_token"] = token
+        return kfp.Client(**kwargs)
     except Exception as exc:
         _raise_connectivity_error(host, exc)
 
@@ -27,6 +30,12 @@ def _raise_connectivity_error(host: str, cause: Exception) -> None:
             "The ml-pipeline backend service is not responding. "
             "Check that all KFP pods are Running: kubectl get pods -n kubeflow"
         )
+    elif "401" in msg or "Unauthorized" in msg:
+        hint = (
+            f"Kubeflow Pipelines at {host} returned 401 Unauthorized. "
+            "Pass a bearer token in the 'token' field. "
+            "To get a token: kubectl -n kubeflow create token default-editor"
+        )
     elif "Connection refused" in msg or "Failed to establish" in msg:
         hint = (
             f"Cannot reach Kubeflow Pipelines at {host}. "
@@ -38,11 +47,10 @@ def _raise_connectivity_error(host: str, cause: Exception) -> None:
     raise ConnectionError(hint) from cause
 
 
-def list_pipelines(host: str) -> list[dict]:
+def list_pipelines(host: str, token: str = "") -> list[dict]:
     """Return all pipelines as a list of dicts with id, name, created_at."""
-    import socket
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     try:
         response = client.list_pipelines()
     except Exception as exc:
@@ -58,10 +66,10 @@ def list_pipelines(host: str) -> list[dict]:
     ]
 
 
-def list_runs(host: str, experiment_id: str = "") -> list[dict]:
+def list_runs(host: str, experiment_id: str = "", token: str = "") -> list[dict]:
     """Return runs, optionally filtered by experiment_id."""
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     kwargs: dict = {}
     if experiment_id:
         kwargs["experiment_id"] = experiment_id
@@ -85,10 +93,11 @@ def submit_run(
     pipeline_id: str,
     run_name: str,
     params: dict,
+    token: str = "",
 ) -> dict:
     """Submit a pipeline run and return basic run info."""
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     try:
         run = client.run_pipeline(
             experiment_id=None,
@@ -105,10 +114,10 @@ def submit_run(
     }
 
 
-def get_run_status(host: str, run_id: str) -> dict:
+def get_run_status(host: str, run_id: str, token: str = "") -> dict:
     """Return the current status of a pipeline run."""
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     try:
         run = client.get_run(run_id=run_id)
     except Exception as exc:

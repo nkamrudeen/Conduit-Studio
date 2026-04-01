@@ -37,6 +37,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
     fields: [
       { key: 'host', label: 'Kubeflow Host', placeholder: 'http://localhost:8080', type: 'url' },
       { key: 'namespace', label: 'Namespace', placeholder: 'kubeflow' },
+      { key: 'token', label: 'Bearer Token (if auth enabled)', placeholder: 'kubectl -n kubeflow create token default-editor', type: 'password' },
     ],
     testEndpoint: '/api/kubeflow/pipelines',
     docsUrl: 'https://www.kubeflow.org/docs/components/pipelines/',

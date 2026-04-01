@@ -58,6 +58,12 @@ async def test_huggingface(token: str = "") -> dict:
     def _check():
         try:
             from huggingface_hub import whoami  # noqa: PLC0415
+        except ImportError:
+            raise ConnectionError(
+                "huggingface_hub is not installed. "
+                "Run: pip install huggingface_hub"
+            )
+        try:
             info = whoami(token=token or None)
             return f"Connected as {info.get('name', 'unknown')}"
         except Exception as exc:
@@ -77,6 +83,9 @@ async def test_openai(api_key: str = "", base_url: str = "") -> dict:
     def _check():
         try:
             from openai import OpenAI  # noqa: PLC0415
+        except ImportError:
+            raise ConnectionError("openai is not installed. Run: pip install openai")
+        try:
             kwargs: dict = {"api_key": api_key or None}
             if base_url:
                 kwargs["base_url"] = base_url
@@ -101,6 +110,9 @@ async def test_anthropic(api_key: str = "") -> dict:
     def _check():
         try:
             import anthropic  # noqa: PLC0415
+        except ImportError:
+            raise ConnectionError("anthropic is not installed. Run: pip install anthropic")
+        try:
             client = anthropic.Anthropic(api_key=api_key or None)
             # Cheapest possible call: count tokens on an empty string
             client.messages.count_tokens(
@@ -130,6 +142,9 @@ async def test_s3(
     def _check():
         try:
             import boto3  # noqa: PLC0415
+        except ImportError:
+            raise ConnectionError("boto3 is not installed. Run: pip install boto3")
+        try:
             kwargs: dict = {"region_name": aws_region}
             if aws_access_key_id:
                 kwargs["aws_access_key_id"] = aws_access_key_id

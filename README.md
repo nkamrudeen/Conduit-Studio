@@ -1,11 +1,7 @@
-# ConduitCraft AI — MLOps & LLMOps Visual Pipeline IDE
+# ConduitCraft AI
 
 <p align="center">
-  <img src="apps/web/public/icon.svg" width="72" height="72" alt="ConduitCraft AI" />
-</p>
-
-<p align="center">
-  <strong>Craft Your Pipelines. Ship Your Models.</strong>
+  <img src="apps/web/public/logo-large.svg" width="480" alt="ConduitCraft AI — Craft Your Pipelines. Ship Your Models." />
 </p>
 
 <p align="center">

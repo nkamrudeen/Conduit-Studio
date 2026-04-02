@@ -97,7 +97,7 @@ test.describe('Canvas Toolbar', () => {
       page.waitForEvent('download'),
       page.getByRole('button', { name: /save/i }).click(),
     ])
-    expect(download.suggestedFilename()).toMatch(/\.json$/)
+    expect(download.suggestedFilename()).toMatch(/\.ccraft$/)
   })
 
   test('Load button opens file picker', async ({ page }) => {

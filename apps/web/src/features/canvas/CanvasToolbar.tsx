@@ -1,8 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react'
-import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck, Cpu, Package } from 'lucide-react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
+import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud } from 'lucide-react'
 import { Button } from '@ai-ide/ui'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import type { PipelineDAG } from '@ai-ide/types'
+
+const AUTOSAVE_KEY = 'conduitcraft:autosave'
+const FILE_EXT = '.ccraft'
 
 interface CanvasToolbarProps {
   onRun?: () => void
@@ -21,6 +24,8 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -33,16 +38,30 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const saveToFile = () => {
+  // Auto-save to localStorage 1.5s after any dag change
+  useEffect(() => {
+    if (dag.nodes.length === 0) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(dag))
+        const t = new Date()
+        setAutoSavedAt(`${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}`)
+      } catch { /* storage full — ignore */ }
+    }, 1500)
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  }, [dag])
+
+  const saveToFile = useCallback(() => {
     const json = JSON.stringify(dag, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${dag.name.toLowerCase().replace(/\s+/g, '_')}.pipeline.json`
+    a.download = `${dag.name.toLowerCase().replace(/\s+/g, '_')}${FILE_EXT}`
     a.click()
     URL.revokeObjectURL(url)
-  }
+  }, [dag])
 
   const loadFromFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -70,17 +89,23 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
         key={dag.id}
       />
       <span className="text-[10px] text-muted-foreground">{dag.nodes.length} nodes · {dag.edges.length} edges</span>
+      {autoSavedAt && (
+        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60" title="Auto-saved to browser storage">
+          <Cloud size={9} />
+          {autoSavedAt}
+        </span>
+      )}
 
       <div className="ml-auto flex gap-1">
-        <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={saveToFile} title="Save pipeline to JSON file">
+        <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={saveToFile} title={`Save pipeline as ${FILE_EXT} file`}>
           <Download size={11} />
           Save
         </Button>
-        <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={() => fileInputRef.current?.click()} title="Load pipeline from JSON file">
+        <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={() => fileInputRef.current?.click()} title="Load pipeline from .ccraft or .json file">
           <FolderOpen size={11} />
           Load
         </Button>
-        <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={loadFromFile} />
+        <input ref={fileInputRef} type="file" accept=".ccraft,.json" className="hidden" onChange={loadFromFile} />
         <Button
           size="sm"
           variant="ghost"

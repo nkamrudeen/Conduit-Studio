@@ -16,13 +16,19 @@ def _get_kfp_client(host: str, token: str = ""):
     try:
         kwargs: dict = {"host": host}
         if token:
+            # Strip whitespace and any non-latin-1 characters that sneak in
+            # via copy-paste (e.g. ellipsis U+2026 from terminal truncation).
+            # Real authservice_session / bearer tokens are ASCII-only so this
+            # is safe and avoids UnicodeEncodeError in http.client.putheader.
+            clean_token = "".join(c for c in token.strip() if ord(c) < 256)
+
             # Full KFP installs with oauth2-proxy/Istio use a session cookie;
             # bare KFP installs accept a Bearer token.  Try cookie auth first —
             # it's the more common case when the healthz page returns HTML.
             if _is_oauth_protected(host):
-                kwargs["cookies"] = f"authservice_session={token}"
+                kwargs["cookies"] = f"authservice_session={clean_token}"
             else:
-                kwargs["existing_token"] = token
+                kwargs["existing_token"] = clean_token
         return kfp.Client(**kwargs)
     except Exception as exc:
         _raise_connectivity_error(host, exc)

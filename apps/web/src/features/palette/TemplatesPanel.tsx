@@ -200,10 +200,10 @@ export function TemplatesPanel({ pipeline }: TemplatesPanelProps) {
       {!showSaveForm && (
         <button
           onClick={() => setShowSaveForm(true)}
-          className="mx-2 mt-2 flex items-center justify-center gap-1.5 rounded border border-dashed border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-foreground"
+          className="mx-2 mt-2 flex items-center justify-center gap-1.5 rounded bg-primary px-2 py-2 text-[11px] font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:opacity-80"
         >
-          <BookmarkPlus size={11} />
-          Save current pipeline as template…
+          <BookmarkPlus size={12} />
+          Save Pipeline as Template
         </button>
       )}
 

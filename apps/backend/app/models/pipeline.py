@@ -48,4 +48,5 @@ class PipelineRunResponse(BaseModel):
 class KubeflowRunRequest(BaseModel):
     dag: PipelineDAG
     kubeflow_host: str
+    kubeflow_token: str = ""
     experiment_name: str = "Default"

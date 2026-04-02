@@ -896,6 +896,7 @@ async def execute_pipeline_kubeflow(
     dag: dict[str, Any],
     kubeflow_host: str,
     experiment_name: str = "Default",
+    kubeflow_token: str = "",
 ) -> None:
     """Compile the pipeline to KFP DSL, then submit it to a Kubeflow Pipelines cluster."""
     queue: asyncio.Queue = asyncio.Queue()
@@ -968,8 +969,8 @@ async def execute_pipeline_kubeflow(
 
         # ── 4. Submit via KFP SDK (blocking → run in thread) ─────────────
         def _submit() -> str:
-            import kfp  # noqa: PLC0415
-            client = kfp.Client(host=kubeflow_host)
+            from app.services.integrations.kubeflow_client import _get_kfp_client  # noqa: PLC0415
+            client = _get_kfp_client(kubeflow_host, kubeflow_token)
             run_info = client.create_run_from_pipeline_package(
                 pipeline_file=yaml_path,
                 arguments={},

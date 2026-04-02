@@ -30,6 +30,7 @@ export function CanvasPage() {
   const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
   const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
   const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
+  const [kubeflowToken, setKubeflowToken] = useState('')
 
   // Switch pipeline mode when URL changes
   React.useEffect(() => {
@@ -85,7 +86,7 @@ export function CanvasPage() {
       const res = await fetch(`${getApiBase()}/pipeline/run-kubeflow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, experiment_name: kubeflowExperiment, env_vars: getIntegrationEnvVars() }),
+        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, kubeflow_token: kubeflowToken, experiment_name: kubeflowExperiment, env_vars: getIntegrationEnvVars() }),
       })
       if (!res.ok) throw new Error(`Backend error ${res.status}: ${await res.text()}`)
       const { run_id } = await res.json()
@@ -98,7 +99,7 @@ export function CanvasPage() {
       setIsRunning(false)
       setShowLogs(false)
     }
-  }, [dag, kubeflowHost, kubeflowExperiment, updateNodeStatus])
+  }, [dag, kubeflowHost, kubeflowToken, kubeflowExperiment, updateNodeStatus])
 
   const handleValidate = useCallback(() => {
     const errors = validatePortTypes(dag, definitionMap)
@@ -247,9 +248,10 @@ export function CanvasPage() {
             <div className="mb-4 rounded border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-[10.5px] text-blue-300/80 space-y-1">
               <p className="font-medium text-blue-300">Required: port-forward the Istio ingress gateway</p>
               <p className="font-mono text-[10px] text-blue-200/70 select-all">kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80</p>
-              <p>Then set the host to <span className="font-mono">http://localhost:8080</span> below.</p>
-              <p className="mt-1 text-blue-300/60">Check pod health if submissions fail:<br />
-                <span className="font-mono text-[10px]">kubectl get pods -n kubeflow</span></p>
+              <p className="mt-1 font-medium text-blue-300">Get your auth token (authservice_session cookie)</p>
+              <p className="text-blue-300/70">Open the KFP UI in your browser → DevTools (F12) → Application → Cookies → copy <span className="font-mono">authservice_session</span></p>
+              <p className="mt-1 text-blue-300/60">Or via kubectl:<br />
+                <span className="font-mono text-[10px] select-all">kubectl -n kubeflow create token default-editor</span></p>
             </div>
 
             <div className="space-y-3">
@@ -260,6 +262,18 @@ export function CanvasPage() {
                   value={kubeflowHost}
                   onChange={(e) => setKubeflowHost(e.target.value)}
                   placeholder="http://localhost:8080"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">
+                  Auth Token <span className="text-muted-foreground/50">(authservice_session cookie or bearer token)</span>
+                </label>
+                <input
+                  type="password"
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none font-mono"
+                  value={kubeflowToken}
+                  onChange={(e) => setKubeflowToken(e.target.value)}
+                  placeholder="Paste authservice_session value or bearer token…"
                 />
               </div>
               <div>

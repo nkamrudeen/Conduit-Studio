@@ -94,6 +94,7 @@ async def run_pipeline_kubeflow(
         request.dag.model_dump(),
         request.kubeflow_host,
         request.experiment_name,
+        request.kubeflow_token,
     )
     return PipelineRunResponse(run_id=run_id, status="pending")
 

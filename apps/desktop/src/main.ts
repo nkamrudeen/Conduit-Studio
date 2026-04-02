@@ -14,6 +14,7 @@ let mainWindow: BrowserWindow | null = null
 let backendProcess: ChildProcess | null = null
 let webServer: http.Server | null = null
 let webServerPort = 0
+const backendLogs: string[] = []   // rolling last 100 lines of backend output
 
 // ── Static file server for the bundled web app ───────────────────────────────
 // Serving via http://localhost avoids all file:// CORS / crossorigin issues
@@ -122,12 +123,21 @@ function spawnBackend(): void {
 function attachBackendListeners(): void {
   if (!backendProcess) return
 
+  const appendLog = (line: string) => {
+    backendLogs.push(line)
+    if (backendLogs.length > 100) backendLogs.shift()
+  }
+
   backendProcess.stdout?.on('data', (data: Buffer) => {
-    console.log(`[backend] ${data.toString().trim()}`)
+    const line = data.toString().trim()
+    console.log(`[backend] ${line}`)
+    appendLog(line)
   })
 
   backendProcess.stderr?.on('data', (data: Buffer) => {
-    console.error(`[backend:err] ${data.toString().trim()}`)
+    const line = data.toString().trim()
+    console.error(`[backend:err] ${line}`)
+    appendLog(line)
   })
 
   backendProcess.on('exit', (code) => {
@@ -209,11 +219,39 @@ function createWindow(): void {
     if (ready) {
       mainWindow.loadURL(`http://127.0.0.1:${webServerPort}/`)
     } else {
-      mainWindow.loadURL(`data:text/html;charset=utf-8,<html><body style="margin:0;background:%230a0a0a;
-        display:flex;align-items:center;justify-content:center;height:100vh;
-        font-family:system-ui;color:%23ef4444"><div style="text-align:center">
-        <div style="font-size:18px;font-weight:600;margin-bottom:8px">Backend failed to start</div>
-        <div style="font-size:12px;color:%236b7280">Check port 8000 is not in use and restart.</div>
+      const logText = backendLogs.length
+        ? backendLogs.slice(-30).join('\n')
+        : 'No output captured — the executable may be missing or blocked by antivirus.'
+
+      const escapedLog = logText
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+      const backendExe = path.join(getBackendDir(),
+        process.platform === 'win32' ? 'conduit-backend.exe' : 'conduit-backend')
+      const exeExists = fs.existsSync(backendExe)
+      const hint = exeExists
+        ? 'The backend executable was found but failed to run.'
+        : `Executable not found at:<br><code style="font-size:10px">${backendExe}</code><br>Run <b>pyinstaller conduit-backend.spec</b> then rebuild the app.`
+
+      mainWindow.loadURL(`data:text/html;charset=utf-8,<!DOCTYPE html><html><body style="margin:0;background:%230a0a0a;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;
+        font-family:system-ui;color:%23ef4444;padding:24px;box-sizing:border-box">
+        <div style="max-width:720px;width:100%;text-align:center">
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px">Backend failed to start</div>
+          <div style="font-size:12px;color:%236b7280;margin-bottom:16px">${hint}</div>
+          <pre style="text-align:left;background:%230f0f1a;border:1px solid %23333;border-radius:8px;
+            padding:12px;font-size:10px;color:%23a1a1aa;overflow:auto;max-height:300px;white-space:pre-wrap">${escapedLog}</pre>
+          <div style="margin-top:16px;display:flex;gap:10px;justify-content:center">
+            <button onclick="location.reload()" style="padding:8px 20px;border-radius:6px;
+              background:%237c3aed;color:white;border:none;font-size:13px;cursor:pointer">
+              Retry
+            </button>
+            <button onclick="window.open('mailto:?subject=ConduitCraft+Error&body='+encodeURIComponent(document.querySelector('pre').textContent))"
+              style="padding:8px 20px;border-radius:6px;background:%231a1a2e;color:%236b7280;
+              border:1px solid %23333;font-size:13px;cursor:pointer">
+              Copy Logs
+            </button>
+          </div>
         </div></body></html>`)
     }
   })

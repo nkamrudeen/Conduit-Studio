@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud } from 'lucide-react'
+import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud, Folder, X } from 'lucide-react'
 import { Button } from '@ai-ide/ui'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
+import { useProjectStore } from '../../store/projectStore'
 import type { PipelineDAG } from '@ai-ide/types'
 
 const AUTOSAVE_KEY = 'conduitcraft:autosave'
@@ -19,12 +20,84 @@ interface CanvasToolbarProps {
   pipelineType?: 'ml' | 'llm'
 }
 
+// ---------------------------------------------------------------------------
+// Project folder prompt — shown after loading a file when no folder is set
+// ---------------------------------------------------------------------------
+function ProjectFolderPrompt({ onClose }: { onClose: () => void }) {
+  const { projectFolder, setProjectFolder } = useProjectStore()
+  const [path, setPath] = useState(projectFolder ?? '')
+
+  const handleSave = () => {
+    const trimmed = path.trim()
+    if (trimmed) setProjectFolder(trimmed)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="w-[420px] rounded-lg border border-border bg-card p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Folder size={15} className="text-primary shrink-0" />
+            <h2 className="text-sm font-semibold">Set Project Folder</h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X size={14} />
+          </button>
+        </div>
+
+        <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
+          Set a project folder so generated code, notebooks, and uploaded data are saved alongside your pipeline file.
+          You can change this anytime in the <strong>File Browser</strong> panel.
+        </p>
+
+        <input
+          autoFocus
+          type="text"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose() }}
+          placeholder={
+            navigator.platform.startsWith('Win')
+              ? 'C:\\Users\\you\\my-project'
+              : '/home/you/my-project'
+          }
+          className="mb-4 w-full rounded border border-border bg-background px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+          >
+            Skip
+          </button>
+          <button
+            onClick={handleSave}
+            className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main toolbar
+// ---------------------------------------------------------------------------
 export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerInstall, onRunKubeflow, onStop, onValidate, isRunning, pipelineType }: CanvasToolbarProps) {
   const { dag, setDag, resetPipeline } = usePipelineStore()
+  const { projectFolder } = useProjectStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null)
+  const [showFolderPrompt, setShowFolderPrompt] = useState(false)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Close dropdown when clicking outside
@@ -71,6 +144,8 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
       try {
         const loaded = JSON.parse(ev.target?.result as string) as PipelineDAG
         setDag(loaded)
+        // Prompt for project folder if not already set
+        if (!projectFolder) setShowFolderPrompt(true)
       } catch {
         alert('Invalid pipeline file.')
       }
@@ -82,118 +157,119 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
   const disabled = dag.nodes.length === 0
 
   return (
-    <div className="flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5">
-      <input
-        className="h-6 rounded border border-transparent bg-transparent px-1 text-xs font-medium hover:border-border focus:border-border focus:outline-none"
-        defaultValue={dag.name}
-        key={dag.id}
-      />
-      <span className="text-[10px] text-muted-foreground">{dag.nodes.length} nodes · {dag.edges.length} edges</span>
-      {autoSavedAt && (
-        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60" title="Auto-saved to browser storage">
-          <Cloud size={9} />
-          {autoSavedAt}
-        </span>
-      )}
+    <>
+      {showFolderPrompt && <ProjectFolderPrompt onClose={() => setShowFolderPrompt(false)} />}
 
-      <div className="ml-auto flex gap-1">
-        <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={saveToFile} title={`Save pipeline as ${FILE_EXT} file`}>
-          <Download size={11} />
-          Save
-        </Button>
-        <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={() => fileInputRef.current?.click()} title="Load pipeline from .ccraft or .json file">
-          <FolderOpen size={11} />
-          Load
-        </Button>
-        <input ref={fileInputRef} type="file" accept=".ccraft,.json" className="hidden" onChange={loadFromFile} />
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 gap-1 text-xs text-muted-foreground"
-          onClick={() => resetPipeline(dag.pipeline)}
-        >
-          <RotateCcw size={11} />
-          Reset
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 gap-1 text-xs text-muted-foreground hover:text-yellow-400"
-          onClick={onValidate}
-          disabled={disabled}
-          title="Validate port type compatibility"
-        >
-          <ShieldCheck size={11} />
-          Validate
-        </Button>
-
-        {/* Run split button */}
-        {isRunning ? (
-          <Button size="sm" variant="destructive" className="h-6 gap-1 text-xs" onClick={onStop}>
-            <Square size={11} />
-            Stop
-          </Button>
-        ) : (
-          <div ref={dropdownRef} className="relative flex">
-            {/* Primary Run action */}
-            <Button
-              size="sm"
-              className="h-6 gap-1 rounded-r-none border-r border-primary-foreground/20 text-xs"
-              onClick={onRun}
-              disabled={disabled}
-            >
-              <Play size={11} />
-              Run
-            </Button>
-            {/* Chevron to open dropdown */}
-            <Button
-              size="sm"
-              className="h-6 w-5 rounded-l-none px-0 text-xs"
-              onClick={() => setDropdownOpen((v) => !v)}
-              disabled={disabled}
-              title="More run options"
-            >
-              <ChevronDown size={10} />
-            </Button>
-
-            {/* Dropdown menu */}
-            {dropdownOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] overflow-hidden rounded border border-border bg-popover shadow-lg">
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
-                  onClick={() => { setDropdownOpen(false); onRun?.() }}
-                >
-                  <Play size={11} className="text-primary" />
-                  <span>Run Locally</span>
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
-                  onClick={() => { setDropdownOpen(false); onRunDocker?.() }}
-                >
-                  <Box size={11} className="text-blue-400" />
-                  <span>Run as Docker</span>
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
-                  onClick={() => { setDropdownOpen(false); onRunInstall?.() }}
-                >
-                  <Package size={11} className="text-green-400" />
-                  <span>Run (install deps)</span>
-                </button>
-                {pipelineType === 'ml' && (
-                  <button
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted border-t border-border mt-1 pt-2"
-                    onClick={() => { setDropdownOpen(false); onRunKubeflow?.() }}
-                  >
-                    <Cpu size={11} className="text-orange-400" />
-                    <span>Run on Kubeflow</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+      <div className="flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5">
+        <input
+          className="h-6 rounded border border-transparent bg-transparent px-1 text-xs font-medium hover:border-border focus:border-border focus:outline-none"
+          defaultValue={dag.name}
+          key={dag.id}
+        />
+        <span className="text-[10px] text-muted-foreground">{dag.nodes.length} nodes · {dag.edges.length} edges</span>
+        {autoSavedAt && (
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60" title="Auto-saved to browser storage">
+            <Cloud size={9} />
+            {autoSavedAt}
+          </span>
         )}
+
+        <div className="ml-auto flex gap-1">
+          <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={saveToFile} title={`Save pipeline as ${FILE_EXT} file`}>
+            <Download size={11} />
+            Save
+          </Button>
+          <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={() => fileInputRef.current?.click()} title="Load pipeline from .ccraft or .json file">
+            <FolderOpen size={11} />
+            Load
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".ccraft,.json" className="hidden" onChange={loadFromFile} />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 gap-1 text-xs text-muted-foreground"
+            onClick={() => resetPipeline(dag.pipeline)}
+          >
+            <RotateCcw size={11} />
+            Reset
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 gap-1 text-xs text-muted-foreground hover:text-yellow-400"
+            onClick={onValidate}
+            disabled={disabled}
+            title="Validate port type compatibility"
+          >
+            <ShieldCheck size={11} />
+            Validate
+          </Button>
+
+          {/* Run split button */}
+          {isRunning ? (
+            <Button size="sm" variant="destructive" className="h-6 gap-1 text-xs" onClick={onStop}>
+              <Square size={11} />
+              Stop
+            </Button>
+          ) : (
+            <div ref={dropdownRef} className="relative flex">
+              <Button
+                size="sm"
+                className="h-6 gap-1 rounded-r-none border-r border-primary-foreground/20 text-xs"
+                onClick={onRun}
+                disabled={disabled}
+              >
+                <Play size={11} />
+                Run
+              </Button>
+              <Button
+                size="sm"
+                className="h-6 w-5 rounded-l-none px-0 text-xs"
+                onClick={() => setDropdownOpen((v) => !v)}
+                disabled={disabled}
+                title="More run options"
+              >
+                <ChevronDown size={10} />
+              </Button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] overflow-hidden rounded border border-border bg-popover shadow-lg">
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
+                    onClick={() => { setDropdownOpen(false); onRun?.() }}
+                  >
+                    <Play size={11} className="text-primary" />
+                    <span>Run Locally</span>
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
+                    onClick={() => { setDropdownOpen(false); onRunDocker?.() }}
+                  >
+                    <Box size={11} className="text-blue-400" />
+                    <span>Run as Docker</span>
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted"
+                    onClick={() => { setDropdownOpen(false); onRunInstall?.() }}
+                  >
+                    <Package size={11} className="text-green-400" />
+                    <span>Run (install deps)</span>
+                  </button>
+                  {pipelineType === 'ml' && (
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2 text-xs hover:bg-muted border-t border-border mt-1 pt-2"
+                      onClick={() => { setDropdownOpen(false); onRunKubeflow?.() }}
+                    >
+                      <Cpu size={11} className="text-orange-400" />
+                      <span>Run on Kubeflow</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

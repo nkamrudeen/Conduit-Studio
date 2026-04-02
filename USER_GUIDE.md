@@ -1,6 +1,8 @@
-# AI-IDE User Guide
+# ConduitCraft AI — User Guide
 
-This guide walks you through every feature of AI-IDE from first launch to running and exporting a full pipeline.
+*Craft Your Pipelines. Ship Your Models.*
+
+This guide walks you through every feature of ConduitCraft AI from first launch to running and exporting a full pipeline.
 
 ---
 
@@ -11,17 +13,21 @@ This guide walks you through every feature of AI-IDE from first launch to runnin
 3. [Building a Pipeline](#3-building-a-pipeline)
 4. [Configuring Nodes](#4-configuring-nodes)
 5. [Connecting Nodes](#5-connecting-nodes)
-6. [Testing Data Connections](#6-testing-data-connections)
-7. [Generating Code](#7-generating-code)
-8. [Running a Pipeline](#8-running-a-pipeline)
-9. [Saving and Loading Pipelines](#9-saving-and-loading-pipelines)
-10. [Sample Pipelines](#10-sample-pipelines)
-11. [ML vs LLM Pipelines](#11-ml-vs-llm-pipelines)
-12. [Integrations](#12-integrations)
-13. [Plugin Manager](#13-plugin-manager)
-14. [Settings](#14-settings)
-15. [Keyboard Shortcuts](#15-keyboard-shortcuts)
-16. [Troubleshooting](#16-troubleshooting)
+6. [Data Connectors — Test & Preview](#6-data-connectors--test--preview)
+7. [File Upload](#7-file-upload)
+8. [File Browser](#8-file-browser)
+9. [Generating Code](#9-generating-code)
+10. [Running a Pipeline](#10-running-a-pipeline)
+11. [Inline Data Preview](#11-inline-data-preview)
+12. [Saving and Loading Pipelines](#12-saving-and-loading-pipelines)
+13. [Sample Pipelines](#13-sample-pipelines)
+14. [ML vs LLM Pipelines](#14-ml-vs-llm-pipelines)
+15. [Integrations](#15-integrations)
+16. [Plugin Manager](#16-plugin-manager)
+17. [AI Assistant](#17-ai-assistant)
+18. [Settings](#18-settings)
+19. [Keyboard Shortcuts](#19-keyboard-shortcuts)
+20. [Troubleshooting](#20-troubleshooting)
 
 ---
 
@@ -35,44 +41,51 @@ Start both the frontend and backend servers:
 # Terminal 1 — Frontend
 pnpm dev:web         # http://localhost:3000
 
-# Terminal 2 — Backend (required for code gen and Run)
+# Terminal 2 — Backend (required for code gen, Run, uploads, previews)
 cd apps/backend
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Open **http://localhost:3000** in your browser. You will be automatically redirected to the ML Pipeline canvas.
+Open **http://localhost:3000** in your browser. You will be redirected automatically to the ML Pipeline canvas.
 
 ### Launching the desktop app
 
-If you have built the Electron installer, double-click the installer (`.exe` on Windows, `.dmg` on macOS, `.AppImage` on Linux). The desktop app starts the backend automatically — you do not need to run it separately.
+Double-click the installer (`.exe` on Windows, `.dmg` on macOS, `.AppImage` on Linux). The desktop app starts the backend automatically — no separate terminal needed.
+
+If the backend fails to start, the error screen shows:
+- The captured Python startup log (or the path to `conduit-backend.log` for the full traceback)
+- Whether the backend executable was found
+- Step-by-step rebuild instructions if it is missing
+
+Click **Retry** after resolving the issue, or **Copy Logs** to share diagnostics.
 
 ---
 
 ## 2. The IDE Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ⚙ AI-IDE   ML Pipeline | LLM Pipeline | Samples | Plugins     │
-├────────────┬────────────────────────────────┬───────────────────┤
-│            │  Toolbar: name · nodes · Run   │                   │
-│  Node      │────────────────────────────────│  Node             │
-│  Palette   │  Canvas tab  │  Code tab       │  Inspector        │
-│  (left)    │              │                 │  (right)          │
-│            │    React Flow Canvas           │                   │
-│            │    (drag-and-drop area)        │                   │
-├────────────┴────────────────────────────────┴───────────────────┤
-│  Log Panel (appears when pipeline is running)                   │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  ConduitCraft AI   ML Pipeline │ LLM Pipeline │ Samples │ Plugins  [⎇][⚙][🤖]  │
+├──────────────┬─────────────────────────────────────────────┬────────────────────┤
+│              │  Toolbar: pipeline name · node count · Run  │                    │
+│  Node        │─────────────────────────────────────────────│  Node              │
+│  Palette     │  Canvas tab  │  Code tab                    │  Inspector         │
+│  (left)      │                                             │  (right)           │
+│              │         React Flow Canvas                   │                    │
+│              │         (drag-and-drop area)                │                    │
+├──────────────┴─────────────────────────────────────────────┴────────────────────┤
+│  Log Panel (appears while pipeline is running)                                   │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Area | Purpose |
 |---|---|
-| **Header** | Switch between ML Pipeline, LLM Pipeline, Samples, and Plugins. Access Integrations and Settings via the icon buttons (top right). |
+| **Header** | Switch ML / LLM pipelines; open Samples, Plugins. Integrations (⎇), Settings (⚙), AI Assistant (🤖) in top-right. |
 | **Node Palette** (left) | Search and drag node types onto the canvas. |
 | **Canvas** (center) | Build your pipeline by dropping and connecting nodes. |
-| **Code tab** | View generated code and export it. |
-| **Node Inspector** (right) | Configure the selected node's parameters. |
-| **Log Panel** (bottom) | Real-time stdout/stderr output when a pipeline is running. |
+| **Code tab** | Generate, view, and export code in 4 formats. |
+| **Node Inspector** (right) | Configure the selected node's parameters; view live output after a run. |
+| **Log Panel** (bottom) | Real-time stdout/stderr output while a pipeline is running. |
 
 ---
 
@@ -80,78 +93,101 @@ If you have built the Electron installer, double-click the installer (`.exe` on 
 
 ### Adding nodes
 
-1. Find a node in the **Node Palette** on the left. Use the search box to filter by name (e.g., type `csv` to find CSV Ingest).
-2. **Click and drag** the node card onto the canvas.
-3. Release the mouse button — the node appears as a card on the canvas.
+1. Find a node in the **Node Palette** on the left — use the search box to filter (e.g., type `csv`).
+2. **Click and drag** the node card onto the canvas, then release.
 
-### Moving nodes
+### Moving and deleting nodes
 
-Click and drag any node card to reposition it on the canvas.
-
-### Deleting nodes
-
-1. Click the node to select it (a colored border appears).
-2. Press `Delete` or `Backspace`.
+- **Move:** click and drag the node card to reposition.
+- **Delete:** click to select, then press `Delete` or `Backspace`.
 
 ### Canvas navigation
 
 | Action | How |
 |---|---|
 | Pan | Click and drag the canvas background |
-| Zoom in/out | Scroll wheel, or use the `+` / `−` buttons (bottom left) |
-| Fit all nodes | Click the fit-view button (bottom left controls) |
-| Minimap | Always visible (bottom right) — click to jump to any area |
+| Zoom | Scroll wheel, or `+` / `−` buttons (bottom left) |
+| Fit all nodes | Fit-view button (bottom left controls) |
+| Minimap | Always visible (bottom right) — click to jump to an area |
 
 ---
 
 ## 4. Configuring Nodes
 
 1. **Click a node** on the canvas to select it.
-2. The **Node Inspector** panel on the right shows the node's configuration form.
-3. Fill in the fields — for example, set the CSV file path, the target column, or the number of estimators.
+2. The **Node Inspector** panel on the right shows the configuration form.
+3. Fill in the fields — file path, column names, hyperparameters, etc.
 4. Changes are saved automatically to the pipeline state.
 
-The Inspector also shows:
-- **Pipeline badge** (ML or LLM)
-- **Input/Output port types** — the data types that flow in and out
-- **Pip Packages** — libraries this node requires when you run the generated code
+### Inspector sections
+
+| Section | Description |
+|---|---|
+| **Config fields** | All user-configurable parameters for this node |
+| **Integration badge** | Fields pre-filled from your Integrations settings show a blue `integration` tag |
+| **Remote dropdowns** | Fields like *Experiment Name* or *Dataset Name* fetch live options from the backend |
+| **Inputs / Outputs** | Port types that flow into and out of this node |
+| **Pip Packages** | Libraries this node requires when the generated code is run |
+| **Output Preview** | DataFrame table, model name, or metrics shown after a successful run |
 
 ---
 
 ## 5. Connecting Nodes
 
-Nodes have **handles** (small circles) on their left edge (inputs) and right edge (outputs).
+Nodes have **handles** (small coloured circles) on their left edge (inputs) and right edge (outputs).
 
-1. Hover over an **output handle** on a source node — it highlights.
+1. Hover over an **output handle** on the source node — it highlights.
 2. **Click and drag** from the output handle.
 3. **Drop** onto an **input handle** of another node.
-4. A colored, animated edge appears connecting the two nodes.
+4. A coloured, animated edge appears.
 
-### Port type rules
+To **remove** a connection, click the edge and press `Delete`.
 
-Each handle has a type (e.g., `DataFrame`, `Model`, `Embeddings`). Connections between incompatible types are still allowed visually but the generated code may fail if types mismatch.
+### Port type colours
 
-### Removing a connection
-
-Click an edge to select it, then press `Delete`.
+Each handle colour indicates the data type: `DataFrame` (blue), `Model` (purple), `Embeddings` (orange), `Text` (green), `Metrics` (yellow), `Any` (grey). The **Validate** button (toolbar) scans the whole pipeline for type mismatches.
 
 ---
 
-## 6. Testing Data Connections
+## 6. Data Connectors — Test & Preview
 
-For **ingest nodes** (CSV, S3, Azure, GCS, PostgreSQL), the Inspector shows two extra buttons after configuration:
+For **ingest nodes** (CSV, Parquet, S3, Azure, GCS, PostgreSQL, HuggingFace Datasets), the Inspector shows two extra buttons:
 
-- **Test Connection** — calls the backend to verify the data source is reachable. Shows a green ✓ or red ✗.
-- **Preview** — fetches the first 20 rows and displays them as a mini table inside the Inspector.
+- **Test Connection** — verifies the data source is reachable. Shows green ✓ or red ✗ with a message.
+- **Preview** — fetches the first 20 rows and displays them as a table inside the Inspector.
 
-> These buttons require the backend to be running on port 8000.
+> Both buttons require the backend to be running.
+
+**HuggingFace Datasets node:** the *Dataset Name* field shows a live search dropdown as you type. Results are fetched from the Hub and filtered in real time. Your HuggingFace token (set in Integrations) is forwarded automatically for gated datasets.
 
 ---
 
-## 7. Generating Code
+## 7. File Upload
 
-1. Build your pipeline on the canvas (add and connect nodes).
-2. Click the **Code** tab (next to the Canvas tab in the toolbar area).
+Ingest nodes with a **File Path** field show a file upload widget in the Inspector:
+
+1. Click the **↑** (upload) button next to the file path field.
+2. Select a CSV, Parquet, or JSON file from your local machine.
+3. The file is uploaded to the backend and the path is set automatically.
+
+Uploaded files are stored server-side (`apps/backend/uploads/`) and are included automatically in Docker builds. In the desktop app they are stored next to the backend executable.
+
+---
+
+## 8. File Browser
+
+Click the **folder icon** in the toolbar (or set a Project Folder in Settings) to open the **File Browser** panel:
+
+- Browse files and directories in the current project folder.
+- Uploaded files and saved code appear here automatically.
+- Click a file to copy its path into the currently selected node's file path field.
+
+---
+
+## 9. Generating Code
+
+1. Build your pipeline on the canvas.
+2. Click the **Code** tab in the toolbar area.
 3. Click **Generate** to call the backend and produce code.
 4. Use the format tabs to switch between outputs:
 
@@ -159,82 +195,113 @@ For **ingest nodes** (CSV, S3, Azure, GCS, PostgreSQL), the Inspector shows two 
 |---|---|
 | **Python Script** | `pipeline.py` — standalone executable Python script |
 | **Notebook** | `pipeline.ipynb` — Jupyter notebook, one cell per node |
-| **Kubeflow DSL** | `pipeline_kubeflow.py` — Kubeflow Pipelines v2 DSL |
+| **Kubeflow DSL** | `pipeline_kubeflow.py` — Kubeflow Pipelines v2 DSL + compiled YAML |
 | **Dockerfile** | `Dockerfile` + `requirements.txt` — containerised version |
 
-5. Click **Export** to download the file.
+5. **Package Layout** (Python tab only) — toggle to generate an installable Python package:
+   - `src/<slug>/pipeline.py` — all node code wrapped in a `run()` function
+   - `src/<slug>/__init__.py`
+   - `pipeline.py` — root entrypoint that calls `run()`
+   - `requirements.txt`, `pyproject.toml`
 
-> Code generation requires the backend to be running.
+6. **Export** — downloads the active format as a file.
+7. **Save to Project Folder** — writes the active format directly to your project folder. A green ✓ badge appears on the tab to confirm. Each format is saved independently.
+
+> Code generation requires the backend to be running. Generate before saving — the Save button is disabled until code is generated.
 
 ---
 
-## 8. Running a Pipeline
+## 10. Running a Pipeline
 
 1. Build your pipeline on the canvas.
-2. Click the **Run** button in the toolbar (top right of the canvas area).
-3. The **Log Panel** opens at the bottom, showing real-time output.
-4. Each node card updates its border colour as execution progresses:
-   - **Blue border** — node is currently running
-   - **Green border** — node completed successfully
-   - **Red border** — node failed
-5. When all nodes finish, the log shows `✓ Pipeline finished`.
-6. Click **Stop** to interrupt a running pipeline.
-7. Click **✕** on the Log Panel to close it.
+2. Click **Run** in the toolbar dropdown:
 
-> Running requires the backend. If the backend is not running, a red error banner appears: *"Cannot reach backend. Start the FastAPI server on port 8000."*
+| Option | Description |
+|---|---|
+| **Run** | Execute locally with the current Python environment |
+| **Run (install packages)** | Install required pip packages first, then execute |
+| **Run as Docker** | Build a Docker image and execute inside it |
+| **Run as Docker (install)** | Install packages into the Docker image first |
+| **Run on Kubeflow** | Submit the pipeline to Kubeflow Pipelines (prompts for host and experiment) |
+
+3. The **Log Panel** opens at the bottom showing real-time output.
+4. Each node updates its border colour as execution progresses:
+   - **Blue** — currently running
+   - **Green** — completed successfully (output preview appears)
+   - **Red** — failed
+5. Click **✕** on the Log Panel to close it.
+
+> If the backend is not running, a red error banner appears.
 
 ---
 
-## 9. Saving and Loading Pipelines
+## 11. Inline Data Preview
 
-### Save
+After a successful run, each node automatically shows its output directly on the canvas card:
 
-Click the **Save** button (toolbar) to download the current pipeline as a `.pipeline.json` file. The filename is derived from the pipeline name.
+| Output type | What you see on the node |
+|---|---|
+| **DataFrame** | Shape badge (`1000 × 5`) + scrollable mini-table (3 rows × 4 columns) |
+| **Model** | Purple badge with the class name (e.g., `🤖 RandomForestClassifier`) |
+| **Metrics dict** | Key/value list with green values (e.g., `accuracy: 0.9432`) |
+| **Text** | Truncated string preview |
+| **Number** | Raw value |
 
-### Load
+**Full detail in Inspector:** click any node with results to see the complete output in the Node Inspector — a 5-row × 6-column table with dtype badges and the run duration.
 
-Click the **Load** button (toolbar) to open a file picker. Select a previously saved `.pipeline.json` file to restore it.
+Output previews persist until the next run or page refresh.
+
+---
+
+## 12. Saving and Loading Pipelines
+
+### Save / Load
+
+- **Save** (toolbar) — download the current pipeline as `<name>.pipeline.json`.
+- **Load** (toolbar) — open a file picker and restore a saved `.pipeline.json`.
 
 ### Reset
 
-Click **Reset** (toolbar) to clear the canvas. This cannot be undone — save first if you want to keep the current pipeline.
+**Reset** (toolbar) clears the canvas. This cannot be undone — save first.
 
-### Renaming a pipeline
+### Rename
 
-Click the pipeline name field in the toolbar (left side) and type a new name.
+Click the pipeline name field in the toolbar and type a new name.
+
+### Auto-save
+
+Enable **Auto-save Pipeline** in Settings to persist the pipeline to `localStorage` on every change. It is restored automatically on next launch (keyed to `conduitcraft:project`).
 
 ---
 
-## 10. Sample Pipelines
+## 13. Sample Pipelines
 
-Click the **Samples** tab in the top navigation to browse 10 pre-built pipelines.
+Click the **Samples** tab in the header to browse 10 pre-built pipelines:
 
 | Pipeline | Description |
 |---|---|
-| Iris Classification — Random Forest | Multiclass classification with missing-value handling, evaluation, and MLflow logging |
-| House Price Regression — XGBoost | Regression with feature scaling, XGBoost, and MLflow |
-| Customer Churn — Logistic Regression | Binary classification with encoding, scaling, and drift monitoring |
-| Image Classification — Keras CNN | CNN training from S3 data, deployed to HuggingFace Hub |
-| Fraud Detection — Gradient Boosting | From PostgreSQL, with outlier removal, FastAPI serving, and monitoring |
+| Iris Classification — Random Forest | Multiclass classification, MLflow logging, evaluation |
+| House Price Regression — XGBoost | Feature scaling, XGBoost, MLflow |
+| Customer Churn — Logistic Regression | Encoding, scaling, drift monitoring |
+| Image Classification — Keras CNN | CNN from S3 data, deploy to HuggingFace Hub |
+| Fraud Detection — Gradient Boosting | PostgreSQL source, FastAPI serving, monitoring |
 | PDF RAG — OpenAI + Chroma | PDF → chunk → embed → Chroma → GPT-4o → LangServe |
-| Web Scraper RAG — Claude + FAISS | Web docs → HuggingFace embed → FAISS → Claude Sonnet → FastAPI |
-| Local Private RAG — Ollama + FAISS | Fully local: Ollama embeddings + Llama 3 — no cloud APIs |
-| ReAct Agent — OpenAI Tool Use | GPT-4o agent with web search, calculator, and Python REPL |
-| Enterprise RAG — S3 + Pinecone + Claude | Company knowledge base → OpenAI large embed → Pinecone → Claude Opus |
+| Web Scraper RAG — Claude + FAISS | Web docs → HuggingFace embed → FAISS → Claude → FastAPI |
+| Local Private RAG — Ollama + FAISS | Fully local: Ollama + Llama 3, no cloud APIs |
+| ReAct Agent — OpenAI Tool Use | GPT-4o agent with web search, calculator, Python REPL |
+| Enterprise RAG — S3 + Pinecone + Claude | Company knowledge base → OpenAI embed → Pinecone → Claude |
 
-Click **Open in Canvas** on any card to load it into the appropriate pipeline type. You can then inspect, modify, and run it.
-
-The toolbar also has a **Sample** button that loads a quick default sample for the current pipeline type (ML or LLM).
+Click **Open in Canvas** on any card to load it. The toolbar **Sample** button loads a quick default for the current pipeline type.
 
 ---
 
-## 11. ML vs LLM Pipelines
+## 14. ML vs LLM Pipelines
 
 Use the **ML Pipeline** and **LLM Pipeline** tabs in the header to switch modes.
 
-- Each pipeline has its own **separate canvas** — switching tabs does not mix node types.
-- The **Node Palette** automatically shows only nodes relevant to the selected pipeline type.
-- Switching tabs **resets** the canvas for the new pipeline type.
+- Each pipeline has its own **separate canvas** — tabs do not share state.
+- The Node Palette automatically shows only nodes for the active pipeline type.
+- Switching tabs **resets** the canvas for the new type.
 
 ### ML Pipeline node categories
 
@@ -246,72 +313,82 @@ Use the **ML Pipeline** and **LLM Pipeline** tabs in the header to switch modes.
 
 ---
 
-## 12. Integrations
+## 15. Integrations
 
-Click the **Integrations** button (top-right header, the branching icon) to open the Integrations side panel. Configure API keys and endpoints for:
+Click **⎇** (top-right header) to open the Integrations panel. Configure API keys and endpoints for all MLOps services.
 
-| Service | Purpose |
-|---|---|
-| **MLflow** | Experiment tracking, model registry, artifact logging |
-| **Kubeflow Pipelines** | Pipeline submission and run management |
-| **HuggingFace Hub** | Model/dataset download and push |
-| **OpenAI** | API key for OpenAI nodes |
-| **Anthropic** | API key for Claude nodes |
-| **AWS S3** | Access key and secret for S3 connector |
+| Service | Fields | Notes |
+|---|---|---|
+| **MLflow** | Tracking URI, experiment name | Default `http://localhost:5000` |
+| **Kubeflow Pipelines** | Host, namespace, token | OAuth2 proxy detected automatically; paste `authservice_session` cookie for Dex/Istio clusters |
+| **HuggingFace Hub** | Access token, username, cache dir | Token forwarded in dataset/model search dropdowns |
+| **OpenAI** | API key, org ID, base URL | |
+| **Anthropic** | API key | |
+| **AWS S3** | Access key, secret, region | Default region `us-east-1` |
 
-For each integration:
-1. Fill in the endpoint URL or API key.
-2. Click **Test Connection** to verify.
-3. Click **Save** — credentials are stored in `localStorage` (or the OS keychain in Electron).
+**For each integration:**
+1. Fields are pre-filled with sensible defaults — change only what is different in your setup.
+2. Click **Test Connection** to verify the service is reachable.
+3. Click **Save** — credentials are stored in `localStorage` (key `conduitcraft:integrations`).
+4. Configured values are automatically pre-filled in matching node config fields (shown with an `integration` badge).
 
-Documentation links (external) are available on each card.
+### Kubeflow OAuth2 / Dex
 
----
+If your KFP is behind an oauth2-proxy (most full Kubeflow installs), the `/healthz` endpoint returns an HTML login page. To authenticate:
 
-## 13. Plugin Manager
-
-Click the **Plugins** tab in the top navigation to open the Plugin Manager.
-
-### Installing a plugin
-
-1. Find an available plugin in the grid.
-2. Click **Install** — the plugin is installed and enabled.
-
-### Enabling / Disabling a plugin
-
-Toggle the **Enabled / Disabled** switch on an installed plugin card. Disabled plugins do not appear in the Node Palette.
-
-### Removing a plugin
-
-Click **Remove** on an installed plugin card.
-
-### Filtering
-
-Use the category buttons (`connector`, `node`, `integration`) and the `Installed / Available` toggle to filter the plugin list.
+1. Open the KFP UI in your browser and log in.
+2. Open **DevTools → Application → Cookies**.
+3. Copy the value of `authservice_session`.
+4. Paste it into the **Token** field in the Kubeflow integration.
 
 ---
 
-## 14. Settings
+## 16. Plugin Manager
 
-Click the **Settings** button (top-right header, the gear icon) to open the Settings panel.
+Click the **Plugins** tab in the header.
+
+- **Install** — installs and enables a community plugin.
+- **Enable / Disable** toggle — disabled plugins are hidden from the Node Palette.
+- **Remove** — uninstalls the plugin.
+- **Filter** by category (`connector`, `node`, `integration`) and `Installed / Available`.
+
+Installed plugins are discovered from `~/.conduitcraft/plugins/` at startup.
+
+---
+
+## 17. AI Assistant
+
+Click **🤖** (top-right header) or the **Assistant** button on the canvas to open the AI Agent panel.
+
+The assistant can:
+- Suggest the next node to add based on the current pipeline
+- Explain what a selected node does
+- Recommend improvements or alternative approaches
+- Answer questions about ML/LLM pipeline design
+
+Type your question or request in the text field and press **Enter**.
+
+---
+
+## 18. Settings
+
+Click **⚙** (top-right header) to open Settings.
 
 | Setting | Description |
 |---|---|
 | Color Theme | Dark / Light / System |
-| Auto-save Pipeline | Save pipeline to localStorage on every change |
-| Backend URL | URL of the FastAPI server (default: `http://localhost:8000`) |
-| Default Code Format | Format pre-selected in the Code tab |
+| Auto-save Pipeline | Persist pipeline to localStorage on every change |
+| Project Folder | Default folder for saving generated code and uploaded files |
+| Default Code Format | Format pre-selected when the Code tab opens |
 | Show Minimap | Toggle minimap visibility |
 | Show Canvas Grid | Toggle dot-grid background |
 | Snap to Grid | Snap nodes to a grid while dragging |
 | Edge Style | Smooth Step / Bezier / Straight |
 | Plugin Directory | Path scanned for community plugins (desktop only) |
 
-Click **Save Settings** to persist to `localStorage`.
-
 ---
 
-## 15. Keyboard Shortcuts
+## 19. Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
@@ -322,40 +399,71 @@ Click **Save Settings** to persist to `localStorage`.
 
 ---
 
-## 16. Troubleshooting
+## 20. Troubleshooting
 
-### Nodes are not appearing on the canvas after dragging
+### "Cannot reach backend" when clicking Run or Generate
 
-- Ensure you are dropping onto the grey canvas area (not the palette or inspector).
-- Try refreshing the page. The canvas state is preserved in memory per session.
+- Start the backend: `cd apps/backend && uv run uvicorn app.main:app --port 8000`
+- Desktop app: the backend starts automatically. If it fails, click **Copy Logs** on the error screen and check `conduit-backend.log` next to the executable.
 
-### "Cannot reach backend" error when clicking Run or Generate
+### Desktop app shows "Backend failed to start"
 
-- Start the FastAPI backend: `cd apps/backend && uv run uvicorn app.main:app --port 8000`
-- Check the backend URL in **Settings** — it must match the running server (default: `http://localhost:8000`).
-- If using the desktop app, the backend should start automatically. Check the app logs for errors.
+1. Check whether the executable exists — the error screen tells you the exact path.
+2. If missing: rebuild with `pyinstaller conduit-backend.spec --clean` (in `apps/backend/`), then `pnpm dist` (in `apps/desktop/`).
+3. If the exe exists but crashes: read `conduit-backend.log` for the Python traceback.
+4. Click **Retry** after resolving the issue.
 
-### Test Connection returns a red ✗
+### CSV upload "Failed to fetch" / CORS error
 
-- Verify the credentials and endpoint URL in the Inspector.
-- Make sure the data source is reachable from the machine running the backend.
-- Check that required packages are installed in the backend environment (e.g., `boto3` for S3).
+- This is fixed in the current version. If you see it, ensure the backend is running and the frontend is connecting to `http://127.0.0.1:8000` (not `localhost` on Windows, which may resolve to IPv6).
 
-### Code generation produces a `# ⚠ Unknown node type` comment
+### HuggingFace dataset node — no results in dropdown
 
-- The node definition ID has no matching Jinja2 template in the backend.
-- This is expected for community plugin nodes that do not have backend templates. Use the generated code as a starting point and fill in the node's logic.
+- Click the **Dataset Name** field to focus it — results load on focus.
+- Type a search term; the list refreshes after 400ms debounce.
+- If you have a HF token set in Integrations, it is forwarded automatically for gated datasets.
+- Ensure the backend is running (`GET /huggingface/datasets` must be reachable).
 
-### The Playwright E2E tests fail
+### Kubeflow — "Failed getting healthz endpoint after 5 attempts"
 
-- Ensure the frontend dev server is running on **port 3000** before running tests.
-- Run: `pnpm dev:web` then in a second terminal: `cd apps/web && pnpm exec playwright test`
+Your KFP cluster is behind an OAuth2 proxy (Dex/Istio). The healthz endpoint returns an HTML login page instead of JSON.
 
-### "Module not found" errors when running the generated Python script
+1. Log into the KFP UI in your browser.
+2. Open **DevTools → Application → Cookies**.
+3. Copy `authservice_session` value.
+4. Paste it into the **Token** field in the Kubeflow Integrations panel.
 
-- The generated script lists required packages in the header comment.
-- Install them: `pip install <packages>` or add them to your environment.
+### Test Connection returns red ✗
+
+- Verify credentials and endpoint URL.
+- Make sure the service is reachable from the machine running the backend.
+- Check required packages are installed (e.g., `boto3` for S3, `kfp` for Kubeflow).
+
+### Run / Run as Docker does nothing
+
+Ensure nodes are on the canvas (the Run button is disabled with an empty canvas). If the pipeline starts but all nodes immediately fail, check the Log Panel for an `IndentationError` — this is fixed in the current version; restart the backend after updating.
+
+### Code generation produces `# ⚠ Unknown node type`
+
+The node has no matching Jinja2 template in the backend. This is expected for plugin nodes without backend templates — use the generated code as a starting point and fill in the logic manually.
+
+### "Module not found" running the generated Python script
+
+The generated script lists required packages in a header comment. Install them:
+```bash
+pip install <packages>
+# or
+uv add <packages>
+```
+
+### E2E tests fail
+
+Ensure the dev server is running on port 3000 before running Playwright:
+```bash
+pnpm dev:web &
+cd apps/web && pnpm exec playwright test
+```
 
 ---
 
-*For additional help, open an issue at https://github.com/ai-ide/ai-ide/issues*
+*For additional help or to report a bug, open an issue at https://github.com/conduitcraft-ai/conduitcraft-ai/issues*

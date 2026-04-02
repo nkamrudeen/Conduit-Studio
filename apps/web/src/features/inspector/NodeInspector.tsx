@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
@@ -358,12 +359,13 @@ interface RemoteOptionsFieldProps {
   onChange: (v: string) => void
 }
 
-function RemoteOptionsField({ label, value, config, optionsDef, onChange }: RemoteOptionsFieldProps) {
+function RemoteOptionsField({ label, fieldKey, value, config, optionsDef, onChange }: RemoteOptionsFieldProps) {
   const [options, setOptions] = useState<{ label: string; value: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const fetchOptions = useCallback(async (currentConfig: Record<string, unknown>) => {
     const path = optionsDef.endpoint(currentConfig)
@@ -381,7 +383,7 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
     }
   }, [optionsDef])
 
-  // Fetch on mount (non-search mode) or when dependent config changes
+  // Fetch on mount (non-search mode)
   useEffect(() => {
     if (!optionsDef.searchMode) {
       fetchOptions(config)
@@ -391,14 +393,29 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
 
   // Close dropdown on outside click
   useEffect(() => {
+    if (!open) return
     const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [open])
+
+  const openDropdown = () => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect()
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 2,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+      })
+    }
+    setOpen(true)
+  }
 
   const handleChange = (v: string) => {
     onChange(v)
@@ -408,13 +425,17 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
     }
   }
 
+  const filtered = options.filter(
+    (o) => !value || o.label.toLowerCase().includes(String(value).toLowerCase())
+  )
+
   return (
-    <div ref={wrapperRef} className="relative">
+    <div>
       <div className="mb-0.5 flex items-center justify-between">
         <label className="text-[11px] font-medium">{label}</label>
         {!optionsDef.searchMode && (
           <button
-            onClick={() => { fetchOptions(config); setOpen(true) }}
+            onClick={() => { fetchOptions(config); openDropdown() }}
             className="text-muted-foreground hover:text-foreground"
             title="Refresh options from server"
           >
@@ -423,27 +444,33 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
         )}
       </div>
       <input
+        ref={inputRef}
         type="text"
         className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         value={String(value ?? '')}
         placeholder={loading ? 'Loading…' : 'Type or select…'}
-        onFocus={() => { setOpen(true); if (options.length === 0) fetchOptions(config) }}
-        onChange={(e) => { handleChange(e.target.value); setOpen(true) }}
+        onFocus={() => {
+          openDropdown()
+          if (options.length === 0) fetchOptions(config)
+        }}
+        onChange={(e) => { handleChange(e.target.value); openDropdown() }}
       />
-      {open && options.length > 0 && (
-        <ul className="absolute z-50 mt-0.5 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-          {options
-            .filter((o) => !value || o.label.toLowerCase().includes(String(value).toLowerCase()))
-            .map((o) => (
-              <li
-                key={o.value}
-                className="cursor-pointer px-2 py-1 text-xs hover:bg-accent"
-                onMouseDown={(e) => { e.preventDefault(); onChange(o.value); setOpen(false) }}
-              >
-                {o.label}
-              </li>
-            ))}
-        </ul>
+      {open && filtered.length > 0 && createPortal(
+        <ul
+          style={dropdownStyle}
+          className="max-h-44 overflow-y-auto rounded-md border border-border bg-popover shadow-xl"
+        >
+          {filtered.map((o) => (
+            <li
+              key={o.value}
+              className="cursor-pointer px-2 py-1 text-xs hover:bg-accent"
+              onMouseDown={(e) => { e.preventDefault(); onChange(o.value); setOpen(false) }}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>,
+        document.body
       )}
     </div>
   )

@@ -28,7 +28,7 @@ export function CanvasPage() {
   const [validateResult, setValidateResult] = useState<PortTypeError[] | null>(null)
 
   const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
-  const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8888')
+  const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
   const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
 
   // Switch pipeline mode when URL changes
@@ -245,10 +245,10 @@ export function CanvasPage() {
 
             {/* Setup hint */}
             <div className="mb-4 rounded border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-[10.5px] text-blue-300/80 space-y-1">
-              <p className="font-medium text-blue-300">Required: port-forward the KFP API service</p>
-              <p className="font-mono text-[10px] text-blue-200/70 select-all">kubectl port-forward svc/ml-pipeline -n kubeflow 8888:8888</p>
-              <p>Then set the host to <span className="font-mono">http://localhost:8888</span> below.</p>
-              <p className="mt-1 text-blue-300/60">If the KFP UI at localhost:8080 shows errors, check pod health:<br />
+              <p className="font-medium text-blue-300">Required: port-forward the Istio ingress gateway</p>
+              <p className="font-mono text-[10px] text-blue-200/70 select-all">kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80</p>
+              <p>Then set the host to <span className="font-mono">http://localhost:8080</span> below.</p>
+              <p className="mt-1 text-blue-300/60">Check pod health if submissions fail:<br />
                 <span className="font-mono text-[10px]">kubectl get pods -n kubeflow</span></p>
             </div>
 
@@ -259,7 +259,7 @@ export function CanvasPage() {
                   className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none"
                   value={kubeflowHost}
                   onChange={(e) => setKubeflowHost(e.target.value)}
-                  placeholder="http://localhost:8888"
+                  placeholder="http://localhost:8080"
                 />
               </div>
               <div>

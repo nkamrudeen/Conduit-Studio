@@ -196,12 +196,12 @@ function createWindow(): void {
   }
 
   // Show splash immediately
-  mainWindow.loadURL(`data:text/html,<html><body style="margin:0;background:%230a0a0a;
+  mainWindow.loadURL(`data:text/html;charset=utf-8,<html><body style="margin:0;background:%230a0a0a;
     display:flex;align-items:center;justify-content:center;height:100vh;
     font-family:system-ui;color:%236366f1"><div style="text-align:center">
     <div style="font-size:22px;font-weight:600;margin-bottom:6px">ConduitCraft AI</div>
     <div style="font-size:11px;color:%236366f1;letter-spacing:0.04em;margin-bottom:10px">Craft Your Pipelines. Ship Your Models.</div>
-    <div style="font-size:13px;color:%236b7280">Starting\u2026</div>
+    <div style="font-size:13px;color:%236b7280">Starting...</div>
     </div></body></html>`)
 
   waitForBackend('http://localhost:8000/health').then((ready) => {
@@ -209,7 +209,7 @@ function createWindow(): void {
     if (ready) {
       mainWindow.loadURL(`http://127.0.0.1:${webServerPort}/`)
     } else {
-      mainWindow.loadURL(`data:text/html,<html><body style="margin:0;background:%230a0a0a;
+      mainWindow.loadURL(`data:text/html;charset=utf-8,<html><body style="margin:0;background:%230a0a0a;
         display:flex;align-items:center;justify-content:center;height:100vh;
         font-family:system-ui;color:%23ef4444"><div style="text-align:center">
         <div style="font-size:18px;font-weight:600;margin-bottom:8px">Backend failed to start</div>

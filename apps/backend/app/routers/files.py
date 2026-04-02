@@ -12,20 +12,26 @@ DELETE /files/{file_id}       — delete an uploaded file
 from __future__ import annotations
 
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi import File as FastAPIFile
 
 router = APIRouter(tags=["files"])
 
 # ---------------------------------------------------------------------------
-# Uploads directory — sits alongside the backend package root
+# Uploads directory
 # ---------------------------------------------------------------------------
-# apps/backend/app/routers/files.py  →  ../../../uploads  = apps/backend/uploads/
-UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
-UPLOADS_DIR.mkdir(exist_ok=True)
+# When frozen by PyInstaller, __file__ resolves inside the read-only MEIPASS
+# temp dir.  Use the directory that contains the executable instead so we
+# always write to a user-writable location.
+if getattr(sys, 'frozen', False):
+    UPLOADS_DIR = Path(sys.executable).parent / "uploads"
+else:
+    UPLOADS_DIR = Path(__file__).parent.parent.parent / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _find_upload(file_id: str) -> Path | None:
@@ -41,17 +47,29 @@ def _find_upload(file_id: str) -> Path | None:
 # ---------------------------------------------------------------------------
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = FastAPIFile(...)) -> dict:
-    """Upload a data file and store it in the server's uploads directory.
+async def upload_file(
+    file: UploadFile = FastAPIFile(...),
+    project_folder: str | None = Form(None),
+) -> dict:
+    """Upload a data file.
 
-    Returns ``file_id``, ``filename``, ``server_path``, and ``size`` so
-    the caller can store the ``server_path`` in the node's ``file_path``
-    config field.
+    When *project_folder* is provided the file is stored inside
+    ``{project_folder}/data/`` so it lives alongside generated code.
+    Otherwise it falls back to the global uploads directory.
+
+    Returns ``file_id``, ``filename``, ``server_path``, and ``size``.
     """
-    file_id = str(uuid.uuid4())
-    # Strip any path separators from the original filename (security)
     safe_name = Path(file.filename or "upload").name
-    dest = UPLOADS_DIR / f"{file_id}_{safe_name}"
+
+    if project_folder:
+        data_dir = Path(project_folder).expanduser().resolve() / "data"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        dest = data_dir / safe_name
+        file_id = safe_name  # stable ID == filename when in project folder
+    else:
+        file_id = str(uuid.uuid4())
+        dest = UPLOADS_DIR / f"{file_id}_{safe_name}"
+
     with dest.open("wb") as fh:
         shutil.copyfileobj(file.file, fh)
     return {

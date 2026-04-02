@@ -22,6 +22,7 @@ async def list_connectors() -> dict:
             {"id": "gcs", "label": "Google Cloud Storage", "formats": ["csv", "parquet", "json"]},
             {"id": "postgres", "label": "PostgreSQL", "formats": ["sql"]},
             {"id": "database", "label": "Generic SQL (SQLAlchemy)", "formats": ["sql"]},
+            {"id": "huggingface", "label": "HuggingFace Datasets", "formats": ["parquet", "arrow"]},
         ]
     }
 
@@ -31,8 +32,11 @@ async def test_connector(req: ConnectorRequest) -> dict:
     connector = CONNECTORS.get(req.connector_id)
     if not connector:
         raise HTTPException(status_code=404, detail=f"Unknown connector: {req.connector_id}")
-    ok = await connector.test_connection(req.config)
-    return {"connector_id": req.connector_id, "success": ok}
+    try:
+        ok = await connector.test_connection(req.config)
+        return {"connector_id": req.connector_id, "success": ok}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/schema")

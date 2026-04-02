@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" fill="none">
+  <defs>
+    <linearGradient id="lg-hex" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c026d3"/>
+      <stop offset="50%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <filter id="lg-neon" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="r1"/>
+      <feColorMatrix in="r1" type="matrix"
+        values="0 0 0 0 0.8  0 0 0 0 0  0 0 0 0 1  0 0 0 1 0" result="r2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="r3"/>
+      <feMerge>
+        <feMergeNode in="r2"/>
+        <feMergeNode in="r3"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="lg-dot" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="r"/>
+      <feMerge><feMergeNode in="r"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="lg-sep" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#7c3aed" stop-opacity="0"/>
+      <stop offset="30%"  stop-color="#7c3aed" stop-opacity="0.6"/>
+      <stop offset="70%"  stop-color="#0891b2" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#0891b2" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Card background -->
+  <rect width="480" height="200" rx="18" fill="#0d0d1f"/>
+  <rect width="480" height="200" rx="18" fill="none" stroke="#2d1b69" stroke-width="1"/>
+
+  <!-- Icon: scale(3) centred at x=240. x_offset=240-16*3=192, y_offset=8 -->
+  <g transform="translate(192,8) scale(3)">
+    <polygon points="16,2.5 27,8.8 27,23.2 16,29.5 5,23.2 5,8.8"
+      fill="url(#lg-hex)" filter="url(#lg-neon)"/>
+    <polygon points="16,5.5 24.2,10.2 24.2,21.8 16,26.5 7.8,21.8 7.8,10.2"
+      fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="0.5"/>
+    <line x1="13" y1="15.8" x2="14.3" y2="12.5"
+      stroke="#e879f9" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="17.7" y1="12.5" x2="19" y2="15.8"
+      stroke="#22d3ee" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="10.8" cy="17.2" r="2.6" fill="#f0abfc" filter="url(#lg-dot)"/>
+    <circle cx="16"   cy="11.2" r="2.6" fill="#fde68a" filter="url(#lg-dot)"/>
+    <circle cx="21.2" cy="17.2" r="2.6" fill="#67e8f9" filter="url(#lg-dot)"/>
+  </g>
+
+  <!-- Separator: icon bottom ≈ 29.5*3+8=96.5, separator at 112 -->
+  <line x1="80" y1="112" x2="400" y2="112" stroke="url(#lg-sep)" stroke-width="1"/>
+
+  <!-- Brand name -->
+  <text x="240" y="140"
+    font-family="'Segoe UI', system-ui, -apple-system, sans-serif"
+    font-size="30" font-weight="700" fill="white"
+    text-anchor="middle" dominant-baseline="central">ConduitCraft AI</text>
+
+  <!-- Tagline -->
+  <text x="240" y="172"
+    font-family="'Segoe UI', system-ui, -apple-system, sans-serif"
+    font-size="13" font-style="italic" fill="#a78bfa"
+    text-anchor="middle" dominant-baseline="central">Craft Your Pipelines. Ship Your Models.</text>
+</svg>

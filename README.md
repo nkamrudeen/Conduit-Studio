@@ -1,17 +1,17 @@
-# Conduit Studio — MLOps & LLMOps Visual Pipeline IDE
+# ConduitCraft AI
 
 <p align="center">
-  <img src="apps/web/public/icon.svg" width="72" height="72" alt="Conduit Studio" />
+  <img src="apps/web/public/logo-large.svg" width="480" alt="ConduitCraft AI — Craft Your Pipelines. Ship Your Models." />
 </p>
 
 <p align="center">
   Open-source drag-and-drop IDE for building ML and LLM pipelines.<br/>
-  Compose pipelines as flowcharts — Conduit Studio generates executable Python scripts,<br/>
+  Compose pipelines as flowcharts — ConduitCraft AI generates executable Python scripts,<br/>
   Jupyter notebooks, Kubeflow DSL, and Dockerfiles from the visual flow.
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" width="960" alt="Conduit Studio — live demo" />
+  <img src="docs/demo.gif" width="960" alt="ConduitCraft AI — live demo" />
 </p>
 
 ---
@@ -145,7 +145,7 @@ See [BUILD.md](BUILD.md) for full build and packaging instructions.
 
 ## Plugin System
 
-Plugins live in `~/.conduit/plugins/`. Each plugin ships a `plugin.manifest.json` and communicates with the host via `postMessage`:
+Plugins live in `~/.conduitcraft/plugins/`. Each plugin ships a `plugin.manifest.json` and communicates with the host via `postMessage`:
 
 ```json
 {

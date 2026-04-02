@@ -301,6 +301,72 @@ def generate_snippets(dag: PipelineDAG) -> tuple[list[PipelineNode], list[str], 
     return ordered, snippets, list(dict.fromkeys(all_packages))
 
 
+def save_format(
+    dag: PipelineDAG,
+    fmt: CodeGenFormat,
+    ordered: list[PipelineNode],
+    snippets: list[str],
+    packages: list[str],
+    project_folder: str,
+    use_package_layout: bool = False,
+) -> list[str]:
+    """Write a single output format to *project_folder*.
+
+    When *fmt* is ``'python'`` and *use_package_layout* is True, the code is
+    placed inside a proper ``src/<slug>/`` package structure with a
+    ``pyproject.toml`` so it can be installed with ``pip install -e .``.
+
+    Returns a sorted list of absolute paths for every file written.
+    """
+    from app.services.codegen import python_gen, notebook_gen, kubeflow_gen, docker_gen, package_gen
+    from pathlib import Path
+
+    root = Path(project_folder).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    written: list[str] = []
+
+    match fmt:
+        case "python":
+            code, _ = python_gen.assemble(dag, snippets, packages)
+            if use_package_layout:
+                written.extend(package_gen.write_package(dag, code, packages, str(root)))
+            else:
+                p = root / "pipeline.py"
+                p.write_text(code, encoding="utf-8")
+                written.append(str(p))
+                req_path = root / "requirements.txt"
+                req_path.write_text("\n".join(packages) + "\n", encoding="utf-8")
+                written.append(str(req_path))
+
+        case "notebook":
+            nb_code, nb_name = notebook_gen.assemble(dag, snippets, packages)
+            nb_path = root / nb_name
+            nb_path.write_text(nb_code, encoding="utf-8")
+            written.append(str(nb_path))
+            req_path = root / "requirements.txt"
+            req_path.write_text("\n".join(packages) + "\n", encoding="utf-8")
+            written.append(str(req_path))
+
+        case "kubeflow":
+            kfp_code, kfp_name = kubeflow_gen.assemble(dag, snippets, packages)
+            kfp_path = root / kfp_name
+            kfp_path.write_text(kfp_code, encoding="utf-8")
+            written.append(str(kfp_path))
+            req_path = root / "requirements.txt"
+            req_path.write_text("\n".join(packages) + "\n", encoding="utf-8")
+            written.append(str(req_path))
+
+        case "docker":
+            docker_code, docker_name = docker_gen.assemble(dag, snippets, packages)
+            (root / docker_name).write_text(docker_code, encoding="utf-8")
+            written.append(str(root / docker_name))
+            req_path = root / "requirements.txt"
+            req_path.write_text("\n".join(packages) + "\n", encoding="utf-8")
+            written.append(str(req_path))
+
+    return sorted(written)
+
+
 def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
     from app.services.codegen import python_gen, notebook_gen, kubeflow_gen, docker_gen
 

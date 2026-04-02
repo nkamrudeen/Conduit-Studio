@@ -17,37 +17,22 @@ from app.services.integrations.kubeflow_client import (
 router = APIRouter(tags=["kubeflow"])
 
 
-# ---------------------------------------------------------------------------
-# GET /pipelines
-# ---------------------------------------------------------------------------
-
-
 @router.get("/pipelines")
-async def get_pipelines(host: str) -> list[dict]:
+async def get_pipelines(host: str, token: str = "") -> list[dict]:
     """List all Kubeflow pipelines on the given host."""
     try:
-        return await asyncio.to_thread(list_pipelines, host)
+        return await asyncio.to_thread(list_pipelines, host, token)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-# ---------------------------------------------------------------------------
-# GET /runs
-# ---------------------------------------------------------------------------
 
 
 @router.get("/runs")
-async def get_runs(host: str, experiment_id: str = "") -> list[dict]:
+async def get_runs(host: str, experiment_id: str = "", token: str = "") -> list[dict]:
     """List Kubeflow pipeline runs, optionally filtered by experiment."""
     try:
-        return await asyncio.to_thread(list_runs, host, experiment_id)
+        return await asyncio.to_thread(list_runs, host, experiment_id, token)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-# ---------------------------------------------------------------------------
-# POST /submit
-# ---------------------------------------------------------------------------
 
 
 class SubmitRunRequest(BaseModel):
@@ -55,6 +40,7 @@ class SubmitRunRequest(BaseModel):
     pipeline_id: str
     run_name: str
     params: dict = {}
+    token: str = ""
 
 
 @router.post("/submit")
@@ -67,20 +53,16 @@ async def submit_pipeline_run(body: SubmitRunRequest) -> dict:
             pipeline_id=body.pipeline_id,
             run_name=body.run_name,
             params=body.params,
+            token=body.token,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-# ---------------------------------------------------------------------------
-# GET /runs/{run_id}
-# ---------------------------------------------------------------------------
-
-
 @router.get("/runs/{run_id}")
-async def get_kubeflow_run_status(run_id: str, host: str) -> dict:
+async def get_kubeflow_run_status(run_id: str, host: str, token: str = "") -> dict:
     """Return the current status of a specific Kubeflow pipeline run."""
     try:
-        return await asyncio.to_thread(get_run_status, host, run_id)
+        return await asyncio.to_thread(get_run_status, host, run_id, token)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -1,6 +1,6 @@
-appId: com.conduitsudio.desktop
-productName: Conduit Studio
-copyright: Copyright © 2024 Conduit Studio Contributors
+appId: com.conduitcraft.desktop
+productName: ConduitCraft AI
+copyright: Copyright © 2024 ConduitCraft AI Contributors
 
 directories:
   output: release
@@ -53,5 +53,5 @@ nsis:
 
 publish:
   provider: github
-  owner: conduit-studio
-  repo: conduit-studio
+  owner: conduitcraft-ai
+  repo: conduitcraft-ai

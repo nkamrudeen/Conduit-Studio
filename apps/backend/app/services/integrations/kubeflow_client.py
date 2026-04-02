@@ -6,7 +6,7 @@ from __future__ import annotations
 _KFP_TIMEOUT = 15
 
 
-def _get_kfp_client(host: str):
+def _get_kfp_client(host: str, token: str = ""):
     try:
         import kfp  # noqa: PLC0415
     except ImportError as exc:
@@ -14,9 +14,33 @@ def _get_kfp_client(host: str):
             "kfp is not installed. Install it with: pip install kfp"
         ) from exc
     try:
-        return kfp.Client(host=host)
+        kwargs: dict = {"host": host}
+        if token:
+            # Full KFP installs with oauth2-proxy/Istio use a session cookie;
+            # bare KFP installs accept a Bearer token.  Try cookie auth first —
+            # it's the more common case when the healthz page returns HTML.
+            if _is_oauth_protected(host):
+                kwargs["cookies"] = f"authservice_session={token}"
+            else:
+                kwargs["existing_token"] = token
+        return kfp.Client(**kwargs)
     except Exception as exc:
         _raise_connectivity_error(host, exc)
+
+
+def _is_oauth_protected(host: str) -> bool:
+    """Return True if the KFP host redirects unauthenticated requests to an OAuth page."""
+    import urllib.request  # noqa: PLC0415
+    try:
+        url = host.rstrip("/") + "/healthz"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            content_type = resp.headers.get("Content-Type", "")
+            body = resp.read(256).decode("utf-8", errors="ignore")
+            return "text/html" in content_type or body.strip().startswith("<")
+    except Exception:
+        # Can't determine — assume not OAuth protected
+        return False
 
 
 def _raise_connectivity_error(host: str, cause: Exception) -> None:
@@ -26,6 +50,15 @@ def _raise_connectivity_error(host: str, cause: Exception) -> None:
             f"Kubeflow Pipelines API at {host} returned 504 Gateway Timeout. "
             "The ml-pipeline backend service is not responding. "
             "Check that all KFP pods are Running: kubectl get pods -n kubeflow"
+        )
+    elif "401" in msg or "Unauthorized" in msg or "Sign In" in msg or "text/html" in msg:
+        hint = (
+            f"Kubeflow Pipelines at {host} requires authentication. "
+            "If your KFP is behind an OAuth2 proxy (Dex/Istio), paste the "
+            "'authservice_session' cookie value from your browser into the Token field. "
+            "To get it: open KFP UI in browser → DevTools → Application → Cookies → "
+            "copy the 'authservice_session' value. "
+            "Alternatively: kubectl -n kubeflow create token default"
         )
     elif "Connection refused" in msg or "Failed to establish" in msg:
         hint = (
@@ -38,11 +71,10 @@ def _raise_connectivity_error(host: str, cause: Exception) -> None:
     raise ConnectionError(hint) from cause
 
 
-def list_pipelines(host: str) -> list[dict]:
+def list_pipelines(host: str, token: str = "") -> list[dict]:
     """Return all pipelines as a list of dicts with id, name, created_at."""
-    import socket
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     try:
         response = client.list_pipelines()
     except Exception as exc:
@@ -58,10 +90,10 @@ def list_pipelines(host: str) -> list[dict]:
     ]
 
 
-def list_runs(host: str, experiment_id: str = "") -> list[dict]:
+def list_runs(host: str, experiment_id: str = "", token: str = "") -> list[dict]:
     """Return runs, optionally filtered by experiment_id."""
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     kwargs: dict = {}
     if experiment_id:
         kwargs["experiment_id"] = experiment_id
@@ -85,10 +117,11 @@ def submit_run(
     pipeline_id: str,
     run_name: str,
     params: dict,
+    token: str = "",
 ) -> dict:
     """Submit a pipeline run and return basic run info."""
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     try:
         run = client.run_pipeline(
             experiment_id=None,
@@ -105,10 +138,10 @@ def submit_run(
     }
 
 
-def get_run_status(host: str, run_id: str) -> dict:
+def get_run_status(host: str, run_id: str, token: str = "") -> dict:
     """Return the current status of a pipeline run."""
     _check_reachable(host)
-    client = _get_kfp_client(host)
+    client = _get_kfp_client(host, token)
     try:
         run = client.get_run(run_id=run_id)
     except Exception as exc:
@@ -123,12 +156,12 @@ def get_run_status(host: str, run_id: str) -> dict:
 
 
 def _check_reachable(host: str) -> None:
-    """Fast TCP check (3s) before making any KFP API call.
+    """TCP + HTTP check before making any KFP API call.
 
-    Raises ConnectionError with a clear message if the host is not reachable,
-    preventing the KFP SDK from hanging on its own (much longer) timeout.
+    Also detects OAuth2-proxy in front of KFP (healthz returns HTML) so we can
+    give an actionable hint instead of "Failed getting healthz endpoint after 5 attempts".
     """
-    import socket
+    import socket  # noqa: PLC0415
     try:
         bare = host.split("://", 1)[-1].split("/")[0]
         parts = bare.rsplit(":", 1)

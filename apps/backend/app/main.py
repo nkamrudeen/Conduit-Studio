@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import pipeline, codegen, connectors, mlflow, kubeflow, huggingface, agent, files
+from app.routers import pipeline, codegen, connectors, mlflow, kubeflow, huggingface, agent, files, project, integrations
 
 app = FastAPI(
-    title="Conduit Studio Backend",
-    description="Execution engine, code generator, and data connectors for Conduit Studio",
+    title="ConduitCraft AI Backend",
+    description="Execution engine, code generator, and data connectors for ConduitCraft AI",
     version="0.1.0",
 )
 
@@ -18,7 +18,9 @@ app.add_middleware(
         # Electron renderer — pages loaded from file:// send Origin: null
         "null",
     ],
-    allow_origin_regex=r"app://.*",  # Electron custom protocol (electron-forge etc.)
+    # Electron production: web app served from http://127.0.0.1:<random-port>
+    # Dev / web: localhost on various ports
+    allow_origin_regex=r"(http://127\.0\.0\.1(:\d+)?|http://localhost(:\d+)?|app://.*)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +34,8 @@ app.include_router(kubeflow.router, prefix="/kubeflow", tags=["kubeflow"])
 app.include_router(huggingface.router, prefix="/huggingface", tags=["huggingface"])
 app.include_router(agent.router, prefix="/agent", tags=["agent"])
 app.include_router(files.router, prefix="/files", tags=["files"])
+app.include_router(project.router, prefix="/project", tags=["project"])
+app.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 
 
 @app.get("/health")

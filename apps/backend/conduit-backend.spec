@@ -1,5 +1,5 @@
 # conduit-backend.spec
-# PyInstaller spec for the Conduit Studio backend server.
+# PyInstaller spec for the ConduitCraft AI backend server.
 #
 # Build (from apps/backend/):
 #   pyinstaller conduit-backend.spec
@@ -68,7 +68,7 @@ hidden_imports = [
     'markupsafe',
     # python-multipart (FastAPI file uploads)
     'multipart',
-    # App modules — FastAPI loads these as strings via importlib
+    # ── App routers ───────────────────────────────────────────────────────────
     'app.main',
     'app.routers.pipeline',
     'app.routers.codegen',
@@ -76,15 +76,35 @@ hidden_imports = [
     'app.routers.mlflow',
     'app.routers.kubeflow',
     'app.routers.huggingface',
-    'app.routers.plugins',
+    'app.routers.agent',
+    'app.routers.files',
+    'app.routers.project',
+    'app.routers.integrations',
+    # ── App models ────────────────────────────────────────────────────────────
+    'app.models.pipeline',
+    'app.models.codegen',
+    'app.models.project',
+    # ── Code generation services ──────────────────────────────────────────────
     'app.services.codegen.engine',
     'app.services.codegen.python_gen',
     'app.services.codegen.notebook_gen',
     'app.services.codegen.kubeflow_gen',
     'app.services.codegen.docker_gen',
+    'app.services.codegen.package_gen',
+    # ── Executor ─────────────────────────────────────────────────────────────
     'app.services.executor',
-    'app.models.pipeline',
-    'app.models.codegen',
+    # ── Connectors ───────────────────────────────────────────────────────────
+    'app.services.connectors.base',
+    'app.services.connectors.local',
+    'app.services.connectors.s3',
+    'app.services.connectors.azure',
+    'app.services.connectors.gcs',
+    'app.services.connectors.database',
+    'app.services.connectors.huggingface',
+    # ── MLOps integrations ────────────────────────────────────────────────────
+    'app.services.integrations.mlflow_client',
+    'app.services.integrations.kubeflow_client',
+    'app.services.integrations.huggingface_client',
 ]
 
 # ── Excluded modules ──────────────────────────────────────────────────────────

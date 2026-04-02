@@ -3,11 +3,13 @@ import { X, Terminal } from 'lucide-react'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 
 interface LogEntry {
-  type: 'log' | 'status' | 'error' | 'done'
+  type: 'log' | 'status' | 'error' | 'done' | 'node_output'
   text?: string
   stream?: 'stdout' | 'stderr'
   status?: string
   node_id?: string | null
+  outputs?: unknown[]
+  durationMs?: number
 }
 
 interface LogPanelProps {
@@ -21,7 +23,7 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
   const [done, setDone] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const { updateNodeStatus } = usePipelineStore()
+  const { updateNodeStatus, updateNodeResult } = usePipelineStore()
 
   useEffect(() => {
     if (!runId) return
@@ -30,7 +32,9 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
     setDone(false)
     setConnected(false)
 
-    const wsUrl = `ws://localhost:8000/pipeline/${runId}/logs`
+    // WebSocket has no CORS — connect directly to the backend in all cases.
+    // Vite proxy can't easily strip prefixes for WS without extra config.
+    const wsUrl = `ws://127.0.0.1:8000/pipeline/${runId}/logs`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
@@ -40,12 +44,20 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
       try {
         const msg: LogEntry = JSON.parse(event.data)
 
-        // Per-node status: update node status in the store
         if (msg.type === 'status' && msg.node_id) {
           const s = msg.status as 'running' | 'success' | 'error'
           if (s === 'running' || s === 'success' || s === 'error') {
             updateNodeStatus(msg.node_id, s)
           }
+        }
+
+        if (msg.type === 'node_output' && msg.node_id && Array.isArray(msg.outputs)) {
+          updateNodeResult(msg.node_id, {
+            outputs: msg.outputs as import('@ai-ide/types').NodeOutputPreview[],
+            durationMs: msg.durationMs,
+          })
+          // Don't push node_output into the visible log entries
+          return
         }
 
         setEntries((prev) => [...prev, msg])
@@ -68,7 +80,7 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
       ws.close()
       wsRef.current = null
     }
-  }, [runId, updateNodeStatus])
+  }, [runId, updateNodeStatus, updateNodeResult])
 
   // Auto-scroll to bottom
   useEffect(() => {

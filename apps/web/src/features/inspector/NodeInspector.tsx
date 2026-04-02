@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
 import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { getNodeIntegrationDefaults } from '../../lib/integrations'
+import { useProjectStore } from '../../store/projectStore'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -15,7 +17,7 @@ const CONNECTOR_MAP: Record<string, string> = {
   'ml.ingest.azure': 'azure',
   'ml.ingest.gcs': 'gcs',
   'ml.ingest.postgres': 'postgres',
-  'ml.ingest.huggingface': 'local',
+  'ml.ingest.huggingface': 'huggingface',
   'llm.ingest.s3_docs': 's3',
 }
 
@@ -240,9 +242,107 @@ export function NodeInspector() {
               </div>
             </div>
           )}
+
+          {/* Inline output results (populated after pipeline run) */}
+          {node.result && node.result.outputs.length > 0 && (
+            <NodeResultPanel result={node.result} />
+          )}
         </div>
       </ScrollArea>
     </aside>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NodeResultPanel — full output preview in the Inspector after a run
+// ---------------------------------------------------------------------------
+
+import type { NodeResult, NodeOutputPreview } from '@ai-ide/types'
+
+function NodeResultPanel({ result }: { result: NodeResult }) {
+  return (
+    <div>
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+        <CheckCircle2 size={9} className="text-green-400" />
+        Output
+        {result.durationMs !== undefined && (
+          <span className="ml-auto font-normal normal-case">
+            {result.durationMs < 1000 ? `${result.durationMs}ms` : `${(result.durationMs / 1000).toFixed(1)}s`}
+          </span>
+        )}
+      </p>
+      {result.outputs.map((out) => (
+        <OutputSection key={out.name} out={out} />
+      ))}
+    </div>
+  )
+}
+
+function OutputSection({ out }: { out: NodeOutputPreview }) {
+  return (
+    <div className="mb-2">
+      <p className="text-[10px] text-muted-foreground mb-0.5">
+        <code className="text-blue-400">{out.name}</code>
+        <span className="ml-1 text-[9px] text-muted-foreground">({out.type})</span>
+      </p>
+      {out.type === 'DataFrame' && out.columns && out.rows && (
+        <div>
+          <p className="text-[9px] text-green-400 mb-1">
+            {out.shape?.[0].toLocaleString()} rows × {out.shape?.[1]} columns
+          </p>
+          <div className="overflow-x-auto rounded border border-border">
+            <table className="text-[9px] w-full">
+              <thead className="bg-muted">
+                <tr>
+                  {out.columns.slice(0, 6).map((c) => (
+                    <th key={c} className="px-1.5 py-0.5 text-left font-medium text-muted-foreground truncate max-w-[80px]">{c}</th>
+                  ))}
+                  {out.columns.length > 6 && <th className="px-1 py-0.5 text-muted-foreground">+{out.columns.length - 6}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {out.rows.slice(0, 5).map((row, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                    {out.columns!.slice(0, 6).map((c) => (
+                      <td key={c} className="px-1.5 py-0.5 text-foreground truncate max-w-[80px]">{String(row[c] ?? '')}</td>
+                    ))}
+                    {out.columns!.length > 6 && <td className="px-1 text-muted-foreground">…</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {out.dtypes && (
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              {Object.entries(out.dtypes).slice(0, 4).map(([c, t]) => (
+                <span key={c} className="rounded bg-muted px-1 py-0 text-[8px] text-muted-foreground">{c}: {t}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {out.type === 'Model' && (
+        <div className="rounded bg-indigo-900/30 px-2 py-1 text-[10px] text-indigo-300">
+          🤖 {out.className}
+        </div>
+      )}
+      {out.type === 'Metrics' && typeof out.value === 'object' && out.value !== null && (
+        <div className="rounded border border-border overflow-hidden">
+          {Object.entries(out.value as Record<string, number>).map(([k, v]) => (
+            <div key={k} className="flex justify-between px-2 py-0.5 text-[9px] even:bg-muted/30">
+              <span className="text-muted-foreground">{k}</span>
+              <span className="text-green-400 font-mono">{typeof v === 'number' ? v.toFixed(4) : String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {out.type === 'Text' && (
+        <div className="rounded bg-muted p-1.5 text-[9px] text-foreground break-words">{String(out.value).slice(0, 300)}</div>
+      )}
+      {out.type === 'Number' && (
+        <div className="text-[10px] text-green-400 font-mono">{String(out.value)}</div>
+      )}
+    </div>
   )
 }
 
@@ -313,7 +413,9 @@ const REMOTE_OPTIONS: Record<string, Record<string, RemoteOptionsDef>> = {
     dataset_name: {
       endpoint: (c) => {
         const q = (c.dataset_name as string) || ''
-        return `/huggingface/datasets?query=${encodeURIComponent(q)}&limit=15`
+        const saved = JSON.parse(localStorage.getItem('conduitcraft:integrations') ?? '{}')
+        const tok: string = saved['HuggingFace Hub']?.token ?? ''
+        return `/huggingface/datasets?query=${encodeURIComponent(q)}&limit=15${tok ? `&token=${encodeURIComponent(tok)}` : ''}`
       },
       toOption: (i) => ({ label: i.id as string, value: i.id as string }),
       searchMode: true,
@@ -324,7 +426,9 @@ const REMOTE_OPTIONS: Record<string, Record<string, RemoteOptionsDef>> = {
     model_name: {
       endpoint: (c) => {
         const q = (c.model_name as string) || 'sentence-transformers'
-        return `/huggingface/models?query=${encodeURIComponent(q)}&task=feature-extraction&limit=15`
+        const saved = JSON.parse(localStorage.getItem('conduitcraft:integrations') ?? '{}')
+        const tok: string = saved['HuggingFace Hub']?.token ?? ''
+        return `/huggingface/models?query=${encodeURIComponent(q)}&task=feature-extraction&limit=15${tok ? `&token=${encodeURIComponent(tok)}` : ''}`
       },
       toOption: (i) => ({ label: i.modelId as string, value: i.modelId as string }),
       searchMode: true,
@@ -353,12 +457,13 @@ interface RemoteOptionsFieldProps {
   onChange: (v: string) => void
 }
 
-function RemoteOptionsField({ label, value, config, optionsDef, onChange }: RemoteOptionsFieldProps) {
+function RemoteOptionsField({ label, fieldKey, value, config, optionsDef, onChange }: RemoteOptionsFieldProps) {
   const [options, setOptions] = useState<{ label: string; value: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const fetchOptions = useCallback(async (currentConfig: Record<string, unknown>) => {
     const path = optionsDef.endpoint(currentConfig)
@@ -376,7 +481,7 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
     }
   }, [optionsDef])
 
-  // Fetch on mount (non-search mode) or when dependent config changes
+  // Fetch on mount (non-search mode)
   useEffect(() => {
     if (!optionsDef.searchMode) {
       fetchOptions(config)
@@ -386,30 +491,49 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
 
   // Close dropdown on outside click
   useEffect(() => {
+    if (!open) return
     const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [open])
+
+  const openDropdown = () => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect()
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 2,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+      })
+    }
+    setOpen(true)
+  }
 
   const handleChange = (v: string) => {
     onChange(v)
     if (optionsDef.searchMode) {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [Object.keys(config)[0] as string]: v }), 400)
+      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [fieldKey]: v }), 400)
     }
   }
 
+  const filtered = options.filter(
+    (o) => !value || o.label.toLowerCase().includes(String(value).toLowerCase())
+  )
+
   return (
-    <div ref={wrapperRef} className="relative">
+    <div>
       <div className="mb-0.5 flex items-center justify-between">
         <label className="text-[11px] font-medium">{label}</label>
         {!optionsDef.searchMode && (
           <button
-            onClick={() => { fetchOptions(config); setOpen(true) }}
+            onClick={() => { fetchOptions(config); openDropdown() }}
             className="text-muted-foreground hover:text-foreground"
             title="Refresh options from server"
           >
@@ -418,27 +542,33 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
         )}
       </div>
       <input
+        ref={inputRef}
         type="text"
         className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         value={String(value ?? '')}
         placeholder={loading ? 'Loading…' : 'Type or select…'}
-        onFocus={() => { setOpen(true); if (!optionsDef.searchMode && options.length === 0) fetchOptions(config) }}
-        onChange={(e) => { handleChange(e.target.value); setOpen(true) }}
+        onFocus={() => {
+          openDropdown()
+          if (options.length === 0) fetchOptions(config)
+        }}
+        onChange={(e) => { handleChange(e.target.value); openDropdown() }}
       />
-      {open && options.length > 0 && (
-        <ul className="absolute z-50 mt-0.5 max-h-44 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-          {options
-            .filter((o) => !value || o.label.toLowerCase().includes(String(value).toLowerCase()))
-            .map((o) => (
-              <li
-                key={o.value}
-                className="cursor-pointer px-2 py-1 text-xs hover:bg-accent"
-                onMouseDown={(e) => { e.preventDefault(); onChange(o.value); setOpen(false) }}
-              >
-                {o.label}
-              </li>
-            ))}
-        </ul>
+      {open && filtered.length > 0 && createPortal(
+        <ul
+          style={dropdownStyle}
+          className="max-h-44 overflow-y-auto rounded-md border border-border bg-popover shadow-xl"
+        >
+          {filtered.map((o) => (
+            <li
+              key={o.value}
+              className="cursor-pointer px-2 py-1 text-xs hover:bg-accent"
+              onMouseDown={(e) => { e.preventDefault(); onChange(o.value); setOpen(false) }}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>,
+        document.body
       )}
     </div>
   )
@@ -559,6 +689,7 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
   const [uploading, setUploading] = useState(false)
   const [uploadedName, setUploadedName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { projectFolder } = useProjectStore()
 
   // If the value already looks like an uploaded server path, show the filename.
   const displayName = uploadedName ?? (value ? value.split(/[\\/]/).pop() ?? value : null)
@@ -583,6 +714,7 @@ function FilePathField({ label, value, onChange }: FilePathFieldProps) {
       const blob = new Blob([buffer], { type: file.type || 'application/octet-stream' })
       const form = new FormData()
       form.append('file', blob, file.name)
+      if (projectFolder) form.append('project_folder', projectFolder)
       const res = await fetch(`${getApiBase()}/files/upload`, { method: 'POST', body: form })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json() as { server_path: string; filename: string }

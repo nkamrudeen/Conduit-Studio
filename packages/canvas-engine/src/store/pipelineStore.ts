@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { v4 as uuid } from 'uuid'
-import type { PipelineDAG, PipelineNode, PipelineEdge, PipelineType } from '@ai-ide/types'
+import type { PipelineDAG, PipelineNode, PipelineEdge, PipelineType, NodeResult } from '@ai-ide/types'
 import { PROPAGATABLE_FIELDS, reachableFrom } from '../utils/dagUtils'
 
 interface PipelineState {
@@ -13,6 +13,7 @@ interface PipelineState {
   updateNodeConfig: (nodeId: string, config: Record<string, unknown>) => void
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void
   updateNodeStatus: (nodeId: string, status: 'idle' | 'running' | 'success' | 'error') => void
+  updateNodeResult: (nodeId: string, result: NodeResult) => void
   removeNode: (nodeId: string) => void
   removeEdge: (edgeId: string) => void
   addEdge: (edge: PipelineEdge) => void
@@ -99,6 +100,12 @@ export const usePipelineStore = create<PipelineState>()(
       set((state) => {
         const node = state.dag.nodes.find((n) => n.id === nodeId)
         if (node) node.status = status
+      }),
+
+    updateNodeResult: (nodeId, result) =>
+      set((state) => {
+        const node = state.dag.nodes.find((n) => n.id === nodeId)
+        if (node) node.result = result
       }),
 
     removeNode: (nodeId) =>

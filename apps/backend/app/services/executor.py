@@ -121,6 +121,62 @@ async def _stream_subprocess(
 # Core executor
 # ---------------------------------------------------------------------------
 
+def _build_capture_code(node_id: str) -> str:
+    """Return Python source that serializes node output variables and prints them.
+
+    The generated code runs inside the try-block (after the node's snippet),
+    so it has access to the variables defined by the snippet.  It:
+    - Scans globals() for DataFrames, sklearn-style models, dicts, scalars
+    - Skips private names and the _aiide_* internals
+    - Prints a single ``__AIIDE_OUTPUT:{node_id}:{json}__`` line
+    """
+    nid = node_id
+    return f"""\
+    try:
+        import json as _j, time as _t
+        _dur = int((_t.time() - _aiide_t0) * 1000)
+        _out = []
+        _skip = set(dir(__builtins__) if isinstance(__builtins__, dict) else [])
+        for _k, _v in list(globals().items()):
+            if _k.startswith('_') or _k in _skip:
+                continue
+            try:
+                _rec = {{"name": _k}}
+                try:
+                    import pandas as _pd
+                    if isinstance(_v, _pd.DataFrame):
+                        _safe = _v.head(5).copy()
+                        for _c in _safe.select_dtypes(include='object').columns:
+                            _safe[_c] = _safe[_c].astype(str)
+                        _rec.update({{"type": "DataFrame",
+                            "shape": list(_v.shape),
+                            "columns": list(_v.columns.astype(str)),
+                            "dtypes": {{c: str(t) for c, t in _v.dtypes.items()}},
+                            "rows": _safe.fillna("").to_dict("records")}})
+                        _out.append(_rec)
+                        continue
+                except Exception:
+                    pass
+                if hasattr(_v, 'predict') and hasattr(_v, 'fit'):
+                    _rec.update({{"type": "Model", "className": type(_v).__name__}})
+                    _out.append(_rec)
+                elif isinstance(_v, dict) and all(isinstance(_kk, str) and isinstance(_vv, (int, float)) for _kk, _vv in _v.items()):
+                    _rec.update({{"type": "Metrics", "value": _v}})
+                    _out.append(_rec)
+                elif isinstance(_v, (int, float)) and not isinstance(_v, bool):
+                    _rec.update({{"type": "Number", "value": _v}})
+                    _out.append(_rec)
+                elif isinstance(_v, str) and len(_v) <= 1000:
+                    _rec.update({{"type": "Text", "value": _v}})
+                    _out.append(_rec)
+            except Exception:
+                pass
+        _payload = _j.dumps({{"outputs": _out, "durationMs": _dur}}, default=str)
+        print(f"__AIIDE_OUTPUT:{nid}:{{_payload}}__", flush=True)
+    except Exception:
+        pass
+"""
+
 def _get_python_executable() -> str:
     """Return the Python interpreter for running generated pipeline scripts.
 
@@ -273,25 +329,29 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any], env_vars: dict[str,
             ordered, snippets, packages = generate_snippets(dag_obj)
 
             # Wrap each snippet with per-node status markers so the log
-            # streamer can emit node-level status events.
+            # streamer can emit node-level status events and output previews.
             wrapped: list[str] = []
             for node, snippet in zip(ordered, snippets):
                 nid = node.id
                 # Indent the snippet body so it sits inside the try block.
                 indented = "\n".join("    " + line for line in snippet.splitlines())
+                # After a successful run, capture output variables and emit a preview.
+                capture = _build_capture_code(nid)
+                capture_indented = "\n".join("    " + line for line in capture.splitlines())
                 wrapped.append(
                     f'print("__AIIDE_NODE_START:{nid}__", flush=True)\n'
+                    f"_aiide_t0 = __import__('time').time()\n"
                     f"try:\n"
                     f"{indented}\n"
                     f'    print("__AIIDE_NODE_END:{nid}:success__", flush=True)\n'
+                    f"{capture_indented}\n"
                     f"except Exception as _aiide_exc:\n"
                     f'    import traceback as _aiide_tb\n'
                     f'    print("__AIIDE_NODE_END:{nid}:error__", flush=True)\n'
                     f'    print(f"[{nid}] error: {{_aiide_exc}}", flush=True)\n'
                     f'    _aiide_tb.print_exc()\n'
-                    # Do NOT re-raise — let independent parallel branches continue running.
-                    # Downstream nodes that depend on this node's output will fail naturally
-                    # with a NameError, which will be caught by their own try/except.
+                    # Do NOT re-raise — downstream nodes that depend on this output
+                    # will fail naturally with a NameError caught by their own try/except.
                 )
 
             code, _ = python_gen.assemble(dag_obj, wrapped, packages)
@@ -320,6 +380,16 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any], env_vars: dict[str,
                 if len(parts) == 2:
                     node_id, status = parts
                     await queue.put({"type": "status", "status": status, "node_id": node_id})
+            elif line.startswith("__AIIDE_OUTPUT:"):
+                # Format: __AIIDE_OUTPUT:{node_id}:{json_payload}__
+                rest = line[len("__AIIDE_OUTPUT:"):-2]  # strip trailing __
+                colon = rest.index(":")
+                node_id = rest[:colon]
+                try:
+                    payload = json.loads(rest[colon + 1:])
+                    await queue.put({"type": "node_output", "node_id": node_id, **payload})
+                except Exception:
+                    pass  # malformed payload — skip silently
             else:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 

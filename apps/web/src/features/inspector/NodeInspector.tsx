@@ -242,9 +242,107 @@ export function NodeInspector() {
               </div>
             </div>
           )}
+
+          {/* Inline output results (populated after pipeline run) */}
+          {node.result && node.result.outputs.length > 0 && (
+            <NodeResultPanel result={node.result} />
+          )}
         </div>
       </ScrollArea>
     </aside>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// NodeResultPanel — full output preview in the Inspector after a run
+// ---------------------------------------------------------------------------
+
+import type { NodeResult, NodeOutputPreview } from '@ai-ide/types'
+
+function NodeResultPanel({ result }: { result: NodeResult }) {
+  return (
+    <div>
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+        <CheckCircle2 size={9} className="text-green-400" />
+        Output
+        {result.durationMs !== undefined && (
+          <span className="ml-auto font-normal normal-case">
+            {result.durationMs < 1000 ? `${result.durationMs}ms` : `${(result.durationMs / 1000).toFixed(1)}s`}
+          </span>
+        )}
+      </p>
+      {result.outputs.map((out) => (
+        <OutputSection key={out.name} out={out} />
+      ))}
+    </div>
+  )
+}
+
+function OutputSection({ out }: { out: NodeOutputPreview }) {
+  return (
+    <div className="mb-2">
+      <p className="text-[10px] text-muted-foreground mb-0.5">
+        <code className="text-blue-400">{out.name}</code>
+        <span className="ml-1 text-[9px] text-muted-foreground">({out.type})</span>
+      </p>
+      {out.type === 'DataFrame' && out.columns && out.rows && (
+        <div>
+          <p className="text-[9px] text-green-400 mb-1">
+            {out.shape?.[0].toLocaleString()} rows × {out.shape?.[1]} columns
+          </p>
+          <div className="overflow-x-auto rounded border border-border">
+            <table className="text-[9px] w-full">
+              <thead className="bg-muted">
+                <tr>
+                  {out.columns.slice(0, 6).map((c) => (
+                    <th key={c} className="px-1.5 py-0.5 text-left font-medium text-muted-foreground truncate max-w-[80px]">{c}</th>
+                  ))}
+                  {out.columns.length > 6 && <th className="px-1 py-0.5 text-muted-foreground">+{out.columns.length - 6}</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {out.rows.slice(0, 5).map((row, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                    {out.columns!.slice(0, 6).map((c) => (
+                      <td key={c} className="px-1.5 py-0.5 text-foreground truncate max-w-[80px]">{String(row[c] ?? '')}</td>
+                    ))}
+                    {out.columns!.length > 6 && <td className="px-1 text-muted-foreground">…</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {out.dtypes && (
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              {Object.entries(out.dtypes).slice(0, 4).map(([c, t]) => (
+                <span key={c} className="rounded bg-muted px-1 py-0 text-[8px] text-muted-foreground">{c}: {t}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {out.type === 'Model' && (
+        <div className="rounded bg-indigo-900/30 px-2 py-1 text-[10px] text-indigo-300">
+          🤖 {out.className}
+        </div>
+      )}
+      {out.type === 'Metrics' && typeof out.value === 'object' && out.value !== null && (
+        <div className="rounded border border-border overflow-hidden">
+          {Object.entries(out.value as Record<string, number>).map(([k, v]) => (
+            <div key={k} className="flex justify-between px-2 py-0.5 text-[9px] even:bg-muted/30">
+              <span className="text-muted-foreground">{k}</span>
+              <span className="text-green-400 font-mono">{typeof v === 'number' ? v.toFixed(4) : String(v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {out.type === 'Text' && (
+        <div className="rounded bg-muted p-1.5 text-[9px] text-foreground break-words">{String(out.value).slice(0, 300)}</div>
+      )}
+      {out.type === 'Number' && (
+        <div className="text-[10px] text-green-400 font-mono">{String(out.value)}</div>
+      )}
+    </div>
   )
 }
 

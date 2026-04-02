@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -29,7 +31,7 @@ async def get_models(
 ) -> list[dict]:
     """Search HuggingFace Hub models."""
     try:
-        return search_models(query, task, limit)
+        return await asyncio.to_thread(search_models, query, task, limit)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -40,10 +42,10 @@ async def get_models(
 
 
 @router.get("/datasets")
-async def get_datasets(query: str, limit: int = 20) -> list[dict]:
-    """Search HuggingFace Hub datasets."""
+async def get_datasets(query: str = "", limit: int = 20, token: str = "") -> list[dict]:
+    """Search HuggingFace Hub datasets. Pass token for private/gated datasets."""
     try:
-        return search_datasets(query, limit)
+        return await asyncio.to_thread(search_datasets, query, limit, token)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -38,10 +38,15 @@ def search_models(
     return results
 
 
-def search_datasets(query: str, limit: int = 20) -> list[dict]:
+def search_datasets(query: str, limit: int = 20, token: str = "") -> list[dict]:
     """Search HuggingFace Hub datasets and return key metadata."""
     hub = _get_hub()
-    datasets = hub.list_datasets(search=query, limit=limit)
+    kwargs: dict = {"limit": limit}
+    if query:
+        kwargs["search"] = query
+    if token:
+        kwargs["token"] = token
+    datasets = hub.list_datasets(**kwargs)
     results = []
     for d in datasets:
         results.append(
@@ -52,6 +57,8 @@ def search_datasets(query: str, limit: int = 20) -> list[dict]:
                 "tags": list(d.tags) if d.tags else [],
             }
         )
+        if len(results) >= limit:
+            break
     return results
 
 

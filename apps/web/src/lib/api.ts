@@ -16,8 +16,9 @@ function isElectron(): boolean {
 
 export function getApiBase(): string {
   if (isElectron()) {
-    // Electron — backend always on localhost:8000
-    return 'http://localhost:8000'
+    // Electron — backend binds to 127.0.0.1; use that directly to avoid
+    // localhost→::1 (IPv6) resolution issues on Windows
+    return 'http://127.0.0.1:8000'
   }
   // Browser dev / web deployment — go through Vite proxy
   return '/api'

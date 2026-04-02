@@ -314,7 +314,9 @@ const REMOTE_OPTIONS: Record<string, Record<string, RemoteOptionsDef>> = {
     dataset_name: {
       endpoint: (c) => {
         const q = (c.dataset_name as string) || ''
-        return `/huggingface/datasets?query=${encodeURIComponent(q)}&limit=15`
+        const saved = JSON.parse(localStorage.getItem('conduitcraft:integrations') ?? '{}')
+        const tok: string = saved['HuggingFace Hub']?.token ?? ''
+        return `/huggingface/datasets?query=${encodeURIComponent(q)}&limit=15${tok ? `&token=${encodeURIComponent(tok)}` : ''}`
       },
       toOption: (i) => ({ label: i.id as string, value: i.id as string }),
       searchMode: true,
@@ -325,7 +327,9 @@ const REMOTE_OPTIONS: Record<string, Record<string, RemoteOptionsDef>> = {
     model_name: {
       endpoint: (c) => {
         const q = (c.model_name as string) || 'sentence-transformers'
-        return `/huggingface/models?query=${encodeURIComponent(q)}&task=feature-extraction&limit=15`
+        const saved = JSON.parse(localStorage.getItem('conduitcraft:integrations') ?? '{}')
+        const tok: string = saved['HuggingFace Hub']?.token ?? ''
+        return `/huggingface/models?query=${encodeURIComponent(q)}&task=feature-extraction&limit=15${tok ? `&token=${encodeURIComponent(tok)}` : ''}`
       },
       toOption: (i) => ({ label: i.modelId as string, value: i.modelId as string }),
       searchMode: true,
@@ -400,7 +404,7 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
     onChange(v)
     if (optionsDef.searchMode) {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [Object.keys(config)[0] as string]: v }), 400)
+      debounceRef.current = setTimeout(() => fetchOptions({ ...config, [fieldKey]: v }), 400)
     }
   }
 
@@ -423,7 +427,7 @@ function RemoteOptionsField({ label, value, config, optionsDef, onChange }: Remo
         className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
         value={String(value ?? '')}
         placeholder={loading ? 'Loading…' : 'Type or select…'}
-        onFocus={() => { setOpen(true); if (!optionsDef.searchMode && options.length === 0) fetchOptions(config) }}
+        onFocus={() => { setOpen(true); if (options.length === 0) fetchOptions(config) }}
         onChange={(e) => { handleChange(e.target.value); setOpen(true) }}
       />
       {open && options.length > 0 && (

@@ -18,7 +18,9 @@ app.add_middleware(
         # Electron renderer — pages loaded from file:// send Origin: null
         "null",
     ],
-    allow_origin_regex=r"app://.*",  # Electron custom protocol (electron-forge etc.)
+    # Electron production: web app served from http://127.0.0.1:<random-port>
+    # Dev / web: localhost on various ports
+    allow_origin_regex=r"(http://127\.0\.0\.1(:\d+)?|http://localhost(:\d+)?|app://.*)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

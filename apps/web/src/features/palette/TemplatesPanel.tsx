@@ -280,24 +280,27 @@ function TemplateCard({
 
   return (
     <div className="rounded-md border border-border bg-background shadow-sm">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-2 p-2.5 text-left"
-      >
-        <span className="mt-0.5 shrink-0 text-base leading-none">{entry.icon}</span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-xs font-semibold text-foreground">{entry.dag.name}</span>
-            <span className={['flex shrink-0 items-center gap-0.5 rounded px-1 py-0 text-[9px] font-medium', COMPLEXITY_COLOR[entry.complexity]].join(' ')}>
-              {COMPLEXITY_ICON[entry.complexity]}
-              {entry.complexity}
-            </span>
+      {/* Header row — div so the delete button isn't nested inside the expand button */}
+      <div className="flex w-full items-start gap-2 p-2.5">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex min-w-0 flex-1 items-start gap-2 text-left"
+        >
+          <span className="mt-0.5 shrink-0 text-base leading-none">{entry.icon}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-xs font-semibold text-foreground">{entry.dag.name}</span>
+              <span className={['flex shrink-0 items-center gap-0.5 rounded px-1 py-0 text-[9px] font-medium', COMPLEXITY_COLOR[entry.complexity]].join(' ')}>
+                {COMPLEXITY_ICON[entry.complexity]}
+                {entry.complexity}
+              </span>
+            </div>
+            <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{entry.description}</p>
           </div>
-          <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{entry.description}</p>
-        </div>
+        </button>
         {onDelete && (
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            onClick={onDelete}
             title={deleteConfirm ? 'Click again to confirm' : 'Delete template'}
             className={[
               'mt-0.5 shrink-0 flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] transition-all',
@@ -310,7 +313,7 @@ function TemplateCard({
             {deleteConfirm && <span className="font-medium">Sure?</span>}
           </button>
         )}
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-border px-2.5 pb-2.5 pt-2">

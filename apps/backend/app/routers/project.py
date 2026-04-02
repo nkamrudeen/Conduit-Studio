@@ -1,11 +1,14 @@
 """Project folder management — create, list files, read file content."""
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
 
 from app.models.project import ProjectCreateRequest, ProjectFile, ProjectFilesResponse
 
@@ -67,6 +70,26 @@ async def list_project_files(folder: str = Query(...)) -> ProjectFilesResponse:
 
     _walk(root, 1)
     return ProjectFilesResponse(folder=str(root), files=files)
+
+
+class SavePipelineRequest(BaseModel):
+    folder: str
+    dag: dict[str, Any]
+
+
+@router.post("/save-pipeline")
+async def save_pipeline(body: SavePipelineRequest) -> dict:
+    """Write the pipeline DAG as a .ccraft file inside *folder*."""
+    try:
+        folder = Path(body.folder).expanduser().resolve()
+        if not folder.exists():
+            folder.mkdir(parents=True, exist_ok=True)
+        name = (body.dag.get("name") or "pipeline").lower().replace(" ", "_")
+        dest = folder / f"{name}.ccraft"
+        dest.write_text(json.dumps(body.dag, indent=2), encoding="utf-8")
+        return {"saved_to": str(dest)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/file", response_class=PlainTextResponse)

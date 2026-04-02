@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { Play, Square, RotateCcw, FolderOpen, Download, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud, Folder, X } from 'lucide-react'
+import { Play, Square, RotateCcw, FolderOpen, Download, Save, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud, Folder, X, AlertCircle } from 'lucide-react'
 import { Button } from '@ai-ide/ui'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { useProjectStore } from '../../store/projectStore'
@@ -98,6 +98,7 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null)
   const [showFolderPrompt, setShowFolderPrompt] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Close dropdown when clicking outside
@@ -125,7 +126,7 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
   }, [dag])
 
-  const saveToFile = useCallback(() => {
+  const downloadToFile = useCallback(() => {
     const json = JSON.stringify(dag, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -135,6 +136,27 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
     a.click()
     URL.revokeObjectURL(url)
   }, [dag])
+
+  const saveToProjectFolder = useCallback(async () => {
+    if (!projectFolder) {
+      setShowFolderPrompt(true)
+      return
+    }
+    setSaveStatus('saving')
+    try {
+      const res = await fetch('http://localhost:8000/project/save-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: projectFolder, dag }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2500)
+    } catch {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }, [dag, projectFolder])
 
   const loadFromFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -174,10 +196,27 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
           </span>
         )}
 
-        <div className="ml-auto flex gap-1">
-          <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={saveToFile} title={`Save pipeline as ${FILE_EXT} file`}>
+        <div className="ml-auto flex items-center gap-1">
+          {/* Save to project folder — primary action */}
+          <Button
+            size="sm"
+            variant={saveStatus === 'saved' ? 'default' : 'outline'}
+            className={[
+              'h-6 gap-1 text-xs font-medium',
+              saveStatus === 'saved' ? 'bg-green-600 text-white hover:bg-green-600 border-green-600' : '',
+              saveStatus === 'error' ? 'border-destructive text-destructive' : '',
+            ].join(' ')}
+            onClick={saveToProjectFolder}
+            disabled={dag.nodes.length === 0 || saveStatus === 'saving'}
+            title={projectFolder ? `Save to ${projectFolder}` : 'Save to project folder'}
+          >
+            {saveStatus === 'error' ? <AlertCircle size={11} /> : <Save size={11} />}
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved!' : saveStatus === 'error' ? 'Error' : 'Save'}
+          </Button>
+          {/* Download as .ccraft file */}
+          <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs text-muted-foreground" onClick={downloadToFile} title={`Download pipeline as ${FILE_EXT} file`} disabled={dag.nodes.length === 0}>
             <Download size={11} />
-            Save
+            Download
           </Button>
           <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={() => fileInputRef.current?.click()} title="Load pipeline from .ccraft or .json file">
             <FolderOpen size={11} />

@@ -100,6 +100,7 @@ hidden_imports = [
     'app.services.connectors.azure',
     'app.services.connectors.gcs',
     'app.services.connectors.database',
+    'app.services.connectors.huggingface',
     # ── MLOps integrations ────────────────────────────────────────────────────
     'app.services.integrations.mlflow_client',
     'app.services.integrations.kubeflow_client',

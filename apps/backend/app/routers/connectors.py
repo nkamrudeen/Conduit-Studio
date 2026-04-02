@@ -22,6 +22,7 @@ async def list_connectors() -> dict:
             {"id": "gcs", "label": "Google Cloud Storage", "formats": ["csv", "parquet", "json"]},
             {"id": "postgres", "label": "PostgreSQL", "formats": ["sql"]},
             {"id": "database", "label": "Generic SQL (SQLAlchemy)", "formats": ["sql"]},
+            {"id": "huggingface", "label": "HuggingFace Datasets", "formats": ["parquet", "arrow"]},
         ]
     }
 

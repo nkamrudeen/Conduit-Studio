@@ -16,7 +16,7 @@ const CONNECTOR_MAP: Record<string, string> = {
   'ml.ingest.azure': 'azure',
   'ml.ingest.gcs': 'gcs',
   'ml.ingest.postgres': 'postgres',
-  'ml.ingest.huggingface': 'local',
+  'ml.ingest.huggingface': 'huggingface',
   'llm.ingest.s3_docs': 's3',
 }
 

@@ -3,6 +3,7 @@ from .s3 import S3Connector
 from .azure import AzureConnector
 from .gcs import GCSConnector
 from .database import DatabaseConnector
+from .huggingface import HuggingFaceConnector
 
 CONNECTORS = {
     "local": LocalConnector(),
@@ -11,4 +12,5 @@ CONNECTORS = {
     "gcs": GCSConnector(),
     "postgres": DatabaseConnector(),
     "database": DatabaseConnector(),
+    "huggingface": HuggingFaceConnector(),
 }

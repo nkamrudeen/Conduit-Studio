@@ -32,12 +32,9 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
     setDone(false)
     setConnected(false)
 
-    const isElectron = navigator.userAgent.includes('Electron') || window.location.protocol === 'file:'
-    // Electron: direct to backend. Dev (Vite): use /ws proxy so Vite forwards
-    // ws://localhost:3000/ws/... → ws://localhost:8000/...
-    const wsUrl = isElectron
-      ? `ws://127.0.0.1:8000/pipeline/${runId}/logs`
-      : `ws://${window.location.host}/ws/pipeline/${runId}/logs`
+    // WebSocket has no CORS — connect directly to the backend in all cases.
+    // Vite proxy can't easily strip prefixes for WS without extra config.
+    const wsUrl = `ws://127.0.0.1:8000/pipeline/${runId}/logs`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 

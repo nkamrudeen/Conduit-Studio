@@ -33,8 +33,11 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
     setConnected(false)
 
     const isElectron = navigator.userAgent.includes('Electron') || window.location.protocol === 'file:'
-    const wsBase = isElectron ? 'ws://127.0.0.1:8000' : `ws://${window.location.host}`
-    const wsUrl = `${wsBase}/pipeline/${runId}/logs`
+    // Electron: direct to backend. Dev (Vite): use /ws proxy so Vite forwards
+    // ws://localhost:3000/ws/... → ws://localhost:8000/...
+    const wsUrl = isElectron
+      ? `ws://127.0.0.1:8000/pipeline/${runId}/logs`
+      : `ws://${window.location.host}/ws/pipeline/${runId}/logs`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 

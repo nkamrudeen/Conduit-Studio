@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { Brain, FlaskConical, Tag, ArrowRight, Zap, Layers, Star, PlusSquare, Trash2, BookmarkPlus, X } from 'lucide-react'
+import { Brain, FlaskConical, Tag, Zap, Layers, Star, BookmarkPlus, X, Trash2, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea } from '@ai-ide/ui'
 import { ML_TEMPLATES, LLM_TEMPLATES, type TemplateEntry } from '../../data/templates'
-import { useUserTemplateStore, type UserTemplateEntry } from '../../store/userTemplateStore'
+import { useUserTemplateStore } from '../../store/userTemplateStore'
 import type { PipelineType, PipelineEdge } from '@ai-ide/types'
 
 interface TemplatesPanelProps {
@@ -71,7 +71,7 @@ function useInsertTemplate() {
 }
 
 // ---------------------------------------------------------------------------
-// Save-as-template form (inline, shown inside the panel)
+// Save-as-template form
 // ---------------------------------------------------------------------------
 const EMOJI_OPTIONS = ['🌲','🚀','🔥','🔗','🦙','🏠','🤖','🧠','⚡','📊','🎯','🛠️','🌐','📑','🔮']
 
@@ -113,7 +113,6 @@ function SaveTemplateForm({ onClose }: { onClose: () => void }) {
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={13} /></button>
       </div>
 
-      {/* Icon picker */}
       <div className="mb-2">
         <p className="mb-1 text-[10px] text-muted-foreground">Icon</p>
         <div className="flex flex-wrap gap-1">
@@ -130,15 +129,12 @@ function SaveTemplateForm({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* Name */}
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Template name"
         className="mb-1.5 w-full rounded border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
       />
-
-      {/* Description */}
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
@@ -146,8 +142,6 @@ function SaveTemplateForm({ onClose }: { onClose: () => void }) {
         rows={2}
         className="mb-1.5 w-full resize-none rounded border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
       />
-
-      {/* Tags */}
       <input
         value={tagsRaw}
         onChange={(e) => setTagsRaw(e.target.value)}
@@ -155,7 +149,6 @@ function SaveTemplateForm({ onClose }: { onClose: () => void }) {
         className="mb-1.5 w-full rounded border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
       />
 
-      {/* Complexity */}
       <div className="mb-2.5 flex gap-1">
         {(['Simple', 'Intermediate', 'Advanced'] as const).map((c) => (
           <button
@@ -193,6 +186,17 @@ export function TemplatesPanel({ pipeline }: TemplatesPanelProps) {
   const userForPipeline = userTemplates.filter((t) => t.dag.pipeline === pipeline)
   const insertTemplate = useInsertTemplate()
   const [showSaveForm, setShowSaveForm] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+
+  const handleDelete = (id: string) => {
+    if (deleteConfirm === id) {
+      remove(id)
+      setDeleteConfirm(null)
+    } else {
+      setDeleteConfirm(id)
+      setTimeout(() => setDeleteConfirm((cur) => cur === id ? null : cur), 3000)
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -200,10 +204,11 @@ export function TemplatesPanel({ pipeline }: TemplatesPanelProps) {
       {!showSaveForm && (
         <button
           onClick={() => setShowSaveForm(true)}
-          className="mx-2 mt-2 flex items-center justify-center gap-1.5 rounded bg-primary px-2 py-2 text-[11px] font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:opacity-80"
+          className="mx-2 mt-2 flex items-center justify-center gap-1.5 rounded-md bg-gradient-to-r from-primary to-primary/80 px-2 py-2 text-[11px] font-semibold text-primary-foreground shadow-sm ring-1 ring-primary/40 hover:from-primary/90 hover:to-primary/70 active:scale-[0.98] transition-all"
         >
           <BookmarkPlus size={12} />
           Save Pipeline as Template
+          <Sparkles size={10} className="opacity-70" />
         </button>
       )}
 
@@ -224,7 +229,8 @@ export function TemplatesPanel({ pipeline }: TemplatesPanelProps) {
                   key={entry.id}
                   entry={entry}
                   onInsert={insertTemplate}
-                  onDelete={() => remove(entry.id)}
+                  onDelete={() => handleDelete(entry.id)}
+                  deleteConfirm={deleteConfirm === entry.id}
                 />
               ))}
             </div>
@@ -254,10 +260,12 @@ function TemplateCard({
   entry,
   onInsert,
   onDelete,
+  deleteConfirm,
 }: {
   entry: TemplateEntry
   onInsert: (e: TemplateEntry) => void
   onDelete?: () => void
+  deleteConfirm?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [inserted, setInserted] = useState(false)
@@ -270,12 +278,10 @@ function TemplateCard({
   }
 
   return (
-    <div className="rounded-md border border-border bg-background shadow-sm">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-2 p-2.5 text-left"
-      >
-        <span className="mt-0.5 shrink-0 text-base leading-none">{entry.icon}</span>
+    <div className="overflow-hidden rounded-lg border border-border bg-background shadow-sm transition-shadow hover:shadow-md">
+      {/* Card header */}
+      <div className="flex items-start gap-2 p-2.5">
+        <span className="mt-0.5 shrink-0 text-lg leading-none">{entry.icon}</span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-xs font-semibold text-foreground">{entry.dag.name}</span>
@@ -286,28 +292,44 @@ function TemplateCard({
           </div>
           <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{entry.description}</p>
         </div>
-        {onDelete && (
+        <div className="flex shrink-0 items-center gap-1">
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              title={deleteConfirm ? 'Click again to confirm delete' : 'Delete template'}
+              className={[
+                'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all',
+                deleteConfirm
+                  ? 'bg-destructive text-white animate-pulse'
+                  : 'text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive',
+              ].join(' ')}
+            >
+              <Trash2 size={11} />
+              {deleteConfirm && <span>Sure?</span>}
+            </button>
+          )}
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete() }}
-            className="mt-0.5 shrink-0 text-muted-foreground/50 hover:text-destructive"
-            title="Delete template"
+            onClick={() => setExpanded((v) => !v)}
+            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            title={expanded ? 'Collapse' : 'Show details'}
           >
-            <Trash2 size={11} />
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
-        )}
-      </button>
+        </div>
+      </div>
 
+      {/* Expandable detail: node chips + tags */}
       {expanded && (
-        <div className="border-t border-border px-2.5 pb-2.5 pt-2">
-          <div className="mb-2 flex flex-wrap gap-1">
+        <div className="border-t border-border bg-muted/30 px-2.5 py-2">
+          <div className="mb-1.5 flex flex-wrap gap-1">
             {entry.dag.nodes.map((n) => (
-              <span key={n.id} className="rounded bg-muted px-1 py-0 text-[9px] font-mono text-muted-foreground">
+              <span key={n.id} className="rounded bg-background px-1 py-0 text-[9px] font-mono text-muted-foreground border border-border">
                 {n.definitionId.split('.').slice(1).join('.')}
               </span>
             ))}
           </div>
           {entry.tags.length > 0 && (
-            <div className="mb-2.5 flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1">
               {entry.tags.map((t) => (
                 <span key={t} className="flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0 text-[9px] text-accent-foreground">
                   <Tag size={7} />{t}
@@ -315,16 +337,29 @@ function TemplateCard({
               ))}
             </div>
           )}
-          <button
-            onClick={handleInsert}
-            className={['flex w-full items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-colors', inserted ? 'bg-green-600 text-white' : 'bg-primary text-primary-foreground hover:opacity-90'].join(' ')}
-          >
-            {inserted ? '✓ Inserted' : (
-              <>{isLlm ? <Brain size={11} /> : <FlaskConical size={11} />}<PlusSquare size={11} />Insert into canvas<ArrowRight size={11} /></>
-            )}
-          </button>
         </div>
       )}
+
+      {/* Insert CTA — always visible */}
+      <button
+        onClick={handleInsert}
+        className={[
+          'flex w-full items-center justify-center gap-2 px-3 py-2 text-[11px] font-semibold transition-all',
+          inserted
+            ? 'bg-green-600 text-white'
+            : 'bg-gradient-to-r from-primary/90 via-primary to-primary/80 text-primary-foreground hover:from-primary hover:via-primary/90 hover:to-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:scale-[0.99]',
+        ].join(' ')}
+      >
+        {inserted ? (
+          <>✓ Inserted into canvas</>
+        ) : (
+          <>
+            {isLlm ? <Brain size={12} /> : <FlaskConical size={12} />}
+            Insert into Canvas
+            <span className="ml-auto opacity-60 text-[10px]">{entry.dag.nodes.length} nodes</span>
+          </>
+        )}
+      </button>
     </div>
   )
 }

@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .turbo/
+apps/backend/uploads/
+apps/backend/conduit-backend.log
+apps/web/playwright-report/
 .env
 .env.local
 *.pyc

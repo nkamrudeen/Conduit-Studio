@@ -23,6 +23,7 @@ export const llmModelNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/model_openai',
     requiredPackages: ['langchain-openai'],
+    supportsPlayground: true,
   },
   {
     id: 'llm.model.anthropic',
@@ -46,6 +47,7 @@ export const llmModelNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/model_anthropic',
     requiredPackages: ['langchain-anthropic'],
+    supportsPlayground: true,
   },
   {
     id: 'llm.model.ollama',
@@ -68,6 +70,7 @@ export const llmModelNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/model_ollama',
     requiredPackages: ['langchain-ollama'],
+    supportsPlayground: true,
   },
   {
     id: 'llm.model.vllm',
@@ -91,5 +94,6 @@ export const llmModelNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/model_vllm',
     requiredPackages: ['langchain-openai'],
+    supportsPlayground: true,
   },
 ]

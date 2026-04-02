@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, Layers, LayoutTemplate } from 'lucide-react'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { Input, ScrollArea, Badge } from '@ai-ide/ui'
+import { TemplatesPanel } from './TemplatesPanel'
 import type { NodeDefinition, PipelineType, NodeCategory } from '@ai-ide/types'
 
 const CATEGORY_ORDER: NodeCategory[] = [
@@ -35,8 +36,11 @@ interface NodePaletteProps {
   pipeline: PipelineType
 }
 
+type PaletteTab = 'nodes' | 'templates'
+
 export function NodePalette({ pipeline }: NodePaletteProps) {
   const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<PaletteTab>('nodes')
 
   const nodes = useMemo(() => {
     const base = query
@@ -57,34 +61,68 @@ export function NodePalette({ pipeline }: NodePaletteProps) {
 
   return (
     <aside data-testid="node-palette" className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-card">
-      <div className="p-2">
-        <div className="relative">
-          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-7 pl-7 text-xs"
-            placeholder="Search nodes…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+      {/* Tab switcher */}
+      <div className="flex shrink-0 border-b border-border">
+        <button
+          onClick={() => setTab('nodes')}
+          className={[
+            'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
+            tab === 'nodes'
+              ? 'border-b-2 border-primary text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          ].join(' ')}
+        >
+          <Layers size={11} /> Nodes
+        </button>
+        <button
+          onClick={() => setTab('templates')}
+          className={[
+            'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
+            tab === 'templates'
+              ? 'border-b-2 border-primary text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          ].join(' ')}
+        >
+          <LayoutTemplate size={11} /> Templates
+        </button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="px-2 pb-4">
-          {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
-            <div key={cat} className="mb-3">
-              <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {CATEGORY_LABELS[cat]}
-              </p>
-              <div className="flex flex-col gap-1">
-                {grouped.get(cat)!.map((node) => (
-                  <NodeCard key={node.id} node={node} />
-                ))}
-              </div>
+      {/* Templates panel */}
+      {tab === 'templates' && <TemplatesPanel pipeline={pipeline} />}
+
+      {/* Nodes panel */}
+      {tab === 'nodes' && (
+        <>
+          <div className="p-2">
+            <div className="relative">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="h-7 pl-7 text-xs"
+                placeholder="Search nodes…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="px-2 pb-4">
+              {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
+                <div key={cat} className="mb-3">
+                  <p className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {CATEGORY_LABELS[cat]}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {grouped.get(cat)!.map((node) => (
+                      <NodeCard key={node.id} node={node} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </>
+      )}
     </aside>
   )
 }

@@ -28,6 +28,7 @@ export const llmChainNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/chain_rag',
     requiredPackages: ['langchain', 'langchain-core'],
+    supportsPlayground: true,
   },
   {
     id: 'llm.chain.react_agent',
@@ -54,6 +55,7 @@ export const llmChainNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/chain_react_agent',
     requiredPackages: ['langchain', 'langgraph'],
+    supportsPlayground: true,
   },
   {
     id: 'llm.chain.langgraph_workflow',

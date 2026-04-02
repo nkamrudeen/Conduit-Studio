@@ -3,10 +3,11 @@ import { createPortal } from 'react-dom'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
-import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw, FlaskConical, Settings } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { getNodeIntegrationDefaults } from '../../lib/integrations'
 import { useProjectStore } from '../../store/projectStore'
+import { PromptPlayground } from './PromptPlayground'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -30,11 +31,13 @@ export function NodeInspector() {
   const [connTest, setConnTest] = useState<'idle' | 'loading' | 'ok' | 'fail'>('idle')
   const [preview, setPreview] = useState<{ columns: string[]; rows: Record<string, unknown>[] } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'config' | 'playground'>('config')
 
   useEffect(() => {
     setConfig(node?.config ?? {})
     setConnTest('idle')
     setPreview(null)
+    setActiveTab('config')
   }, [selectedNodeId, node])
 
   if (!node || !definition) {
@@ -103,6 +106,43 @@ export function NodeInspector() {
         </Badge>
       </div>
 
+      {/* Tab bar — Config always shown; Playground only for supported nodes */}
+      {definition.supportsPlayground && (
+        <div className="flex shrink-0 border-b border-border">
+          <button
+            onClick={() => setActiveTab('config')}
+            className={[
+              'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
+              activeTab === 'config'
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            <Settings size={11} /> Config
+          </button>
+          <button
+            onClick={() => setActiveTab('playground')}
+            className={[
+              'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
+              activeTab === 'playground'
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            ].join(' ')}
+          >
+            <FlaskConical size={11} /> Playground
+          </button>
+        </div>
+      )}
+
+      {/* Playground tab */}
+      {definition.supportsPlayground && activeTab === 'playground' && (
+        <ScrollArea className="flex-1">
+          <PromptPlayground nodeId={node.id} definition={definition} config={config} />
+        </ScrollArea>
+      )}
+
+      {/* Config tab (default) */}
+      {activeTab === 'config' && (
       <ScrollArea className="flex-1">
         <div className="space-y-3 p-3">
           <p className="text-[11px] text-muted-foreground">{definition.description}</p>
@@ -249,6 +289,7 @@ export function NodeInspector() {
           )}
         </div>
       </ScrollArea>
+      )}
     </aside>
   )
 }

@@ -53,4 +53,6 @@ export interface NodeDefinition {
   codeTemplateId: string
   /** pip packages required by this node's generated code */
   requiredPackages: string[]
+  /** If true, the Inspector shows a Playground tab for live prompt testing */
+  supportsPlayground?: boolean
 }

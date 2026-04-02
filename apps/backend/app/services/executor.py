@@ -336,15 +336,16 @@ async def execute_pipeline(run_id: str, dag: dict[str, Any], env_vars: dict[str,
                 # Indent the snippet body so it sits inside the try block.
                 indented = "\n".join("    " + line for line in snippet.splitlines())
                 # After a successful run, capture output variables and emit a preview.
+                # _build_capture_code returns code already at 4-space indent so it
+                # slots directly inside the try: block — do NOT re-indent it.
                 capture = _build_capture_code(nid)
-                capture_indented = "\n".join("    " + line for line in capture.splitlines())
                 wrapped.append(
                     f'print("__AIIDE_NODE_START:{nid}__", flush=True)\n'
                     f"_aiide_t0 = __import__('time').time()\n"
                     f"try:\n"
                     f"{indented}\n"
                     f'    print("__AIIDE_NODE_END:{nid}:success__", flush=True)\n'
-                    f"{capture_indented}\n"
+                    f"{capture}"
                     f"except Exception as _aiide_exc:\n"
                     f'    import traceback as _aiide_tb\n'
                     f'    print("__AIIDE_NODE_END:{nid}:error__", flush=True)\n'
@@ -619,10 +620,13 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any], env_va
             for node, snippet in zip(ordered, snippets):
                 nid = node.id
                 indented = "\n".join("    " + line for line in snippet.splitlines())
+                capture = _build_capture_code(nid)
                 wrapped.append(
                     f'print("__AIIDE_NODE_START:{nid}__", flush=True)\n'
+                    f"_aiide_t0 = __import__('time').time()\n"
                     f"try:\n{indented}\n"
                     f'    print("__AIIDE_NODE_END:{nid}:success__", flush=True)\n'
+                    f"{capture}"
                     f"except Exception as _aiide_exc:\n"
                     f'    print(f"__AIIDE_NODE_END:{nid}:error__", flush=True)\n'
                     f"    raise\n"
@@ -671,6 +675,15 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any], env_va
                 if len(parts) == 2:
                     node_id, status = parts
                     await queue.put({"type": "status", "status": status, "node_id": node_id})
+            elif line.startswith("__AIIDE_OUTPUT:"):
+                rest = line[len("__AIIDE_OUTPUT:"):-2]
+                colon = rest.index(":")
+                node_id = rest[:colon]
+                try:
+                    payload = json.loads(rest[colon + 1:])
+                    await queue.put({"type": "node_output", "node_id": node_id, **payload})
+                except Exception:
+                    pass
             else:
                 await queue.put({"type": "log", "text": line, "stream": stream_name})
 

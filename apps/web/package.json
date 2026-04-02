@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext ts,tsx",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:e2e": "playwright test",
+    "record-demo": "playwright test e2e/record-demo.ts --config playwright.record.config.ts",
+    "capture-shots": "playwright test e2e/capture-shots.ts --config playwright.record.config.ts"
   },
   "dependencies": {
     "@ai-ide/canvas-engine": "workspace:*",

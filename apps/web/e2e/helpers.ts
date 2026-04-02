@@ -6,11 +6,16 @@ export async function goToCanvas(page: Page, type: 'ml' | 'llm' = 'ml') {
   await expect(page.locator('.react-flow')).toBeVisible()
 }
 
-/** Load the built-in sample MLOps flow via the toolbar button */
-export async function loadSamplePipeline(page: Page) {
-  await page.getByRole('button', { name: /sample/i }).click()
-  // Wait for nodes to appear
-  await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 5000 })
+/** Load the first built-in sample pipeline via the Samples page */
+export async function loadSamplePipeline(page: Page, type: 'ml' | 'llm' = 'ml') {
+  await page.goto('/samples')
+  if (type === 'llm') {
+    await page.getByRole('button', { name: /LLM Pipelines/i }).click()
+  }
+  await page.getByRole('button', { name: /Open in Canvas/i }).first().click()
+  // Wait for canvas + nodes
+  await expect(page.locator('.react-flow')).toBeVisible()
+  await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 8000 })
 }
 
 /** Drag the first palette item matching labelPattern onto the center of the canvas */

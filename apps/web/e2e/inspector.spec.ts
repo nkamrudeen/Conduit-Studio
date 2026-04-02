@@ -109,3 +109,24 @@ test.describe('Node Inspector', () => {
     expect(text0).not.toBe(text2)
   })
 })
+
+test.describe('Inline Data Preview', () => {
+  test.beforeEach(async ({ page }) => {
+    await goToCanvas(page, 'ml')
+  })
+
+  test('node card shows no output badge before run', async ({ page }) => {
+    await loadSamplePipeline(page)
+    // Output section only appears after execution — should not be visible yet
+    const outputBadge = page.locator('.react-flow__node').first().locator('[data-testid="node-output-preview"]')
+    await expect(outputBadge).not.toBeVisible()
+  })
+
+  test('inspector does not show Data Preview section before run', async ({ page }) => {
+    await loadSamplePipeline(page)
+    await page.locator('.react-flow__node').first().click()
+    const inspector = page.locator('[data-testid="node-inspector"]')
+    // No result panel before execution
+    await expect(inspector.getByText(/Output Preview/i)).not.toBeVisible()
+  })
+})

@@ -75,4 +75,27 @@ test.describe('Code Generation Panel', () => {
     await page.getByRole('tab', { name: /^canvas/i }).click()
     await expect(page.locator('.react-flow')).toBeVisible()
   })
+
+  test('Package Layout checkbox is only visible on Python Script tab', async ({ page }) => {
+    // Python Script tab is default — checkbox should be present
+    await expect(page.getByRole('tab', { name: /python script/i })).toBeVisible()
+    const checkbox = page.getByLabel(/package layout/i)
+    await expect(checkbox).toBeAttached()
+
+    // Switch to Notebook tab — checkbox should be hidden
+    await page.getByRole('tab', { name: /notebook/i }).click()
+    await expect(page.getByLabel(/package layout/i)).not.toBeVisible()
+  })
+
+  test('Save to Project Folder button is disabled before code is generated', async ({ page }) => {
+    const saveBtn = page.getByRole('button', { name: /save to project/i })
+    await expect(saveBtn).toBeDisabled()
+  })
+
+  test('Save to Project Folder button is present on all format tabs', async ({ page }) => {
+    for (const label of ['Python Script', 'Notebook', 'Kubeflow DSL', 'Dockerfile']) {
+      await page.getByRole('tab', { name: new RegExp(label, 'i') }).click()
+      await expect(page.getByRole('button', { name: /save to project/i })).toBeAttached()
+    }
+  })
 })

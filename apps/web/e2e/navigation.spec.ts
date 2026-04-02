@@ -9,12 +9,12 @@ test.describe('Navigation & Layout', () => {
 
   test('IDE header is always visible', async ({ page }) => {
     await page.goto('/pipeline/ml')
-    await expect(page.getByText('AI-IDE')).toBeVisible()
+    await expect(page.getByText('ConduitCraft AI')).toBeVisible()
   })
 
-  test('header shows subtitle text', async ({ page }) => {
+  test('header shows tagline text', async ({ page }) => {
     await page.goto('/pipeline/ml')
-    await expect(page.getByText(/MLOps/i)).toBeVisible()
+    await expect(page.getByText(/Craft Your Pipelines/i)).toBeVisible()
   })
 
   test('ML Pipeline nav tab is active on /pipeline/ml', async ({ page }) => {
@@ -42,9 +42,10 @@ test.describe('Navigation & Layout', () => {
   })
 
   test('switching ML → LLM resets the canvas', async ({ page }) => {
-    await goToCanvas(page, 'ml')
-    await page.getByRole('button', { name: /sample/i }).click()
-    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 5000 })
+    await page.goto('/samples')
+    await page.getByRole('button', { name: /Open in Canvas/i }).first().click()
+    await page.locator('.react-flow').waitFor({ state: 'visible' })
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 8000 })
 
     // Switch to LLM
     await page.getByRole('link', { name: /LLM Pipeline/i }).click()
@@ -67,9 +68,14 @@ test.describe('Navigation & Layout', () => {
     await expect(page.locator('[data-testid="node-inspector"]')).toBeVisible()
   })
 
-  test('page title contains AI-IDE', async ({ page }) => {
+  test('page title contains ConduitCraft AI', async ({ page }) => {
     await page.goto('/pipeline/ml')
-    await expect(page).toHaveTitle(/AI-IDE/)
+    await expect(page).toHaveTitle(/ConduitCraft AI/)
+  })
+
+  test('Project Files button is visible in header', async ({ page }) => {
+    await page.goto('/pipeline/ml')
+    await expect(page.locator('button[title="Project Files"]')).toBeVisible()
   })
 
   test('Plugins button is visible in header', async ({ page }) => {

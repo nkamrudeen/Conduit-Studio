@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('App shell', () => {
   test('loads and shows the IDE header', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByText('AI-IDE')).toBeVisible()
+    await expect(page.getByText('ConduitCraft AI')).toBeVisible()
     await expect(page.getByText('ML Pipeline')).toBeVisible()
     await expect(page.getByText('LLM Pipeline')).toBeVisible()
   })

@@ -4,6 +4,39 @@ import * as path from 'path'
 import * as os from 'os'
 import * as fs from 'fs'
 
+test.describe('File Browser Panel', () => {
+  test.beforeEach(async ({ page }) => {
+    await goToCanvas(page, 'ml')
+  })
+
+  test('Project Files button is visible in header', async ({ page }) => {
+    await expect(page.locator('button[title="Project Files"]')).toBeVisible()
+  })
+
+  test('clicking Project Files button opens the file browser panel', async ({ page }) => {
+    await page.locator('button[title="Project Files"]').click()
+    await expect(page.getByText(/project files/i).first()).toBeVisible({ timeout: 2000 })
+  })
+
+  test('file browser panel shows project folder path input', async ({ page }) => {
+    await page.locator('button[title="Project Files"]').click()
+    await expect(page.getByPlaceholder(/project folder/i)).toBeVisible({ timeout: 3000 })
+  })
+
+  test('closing file browser hides panel', async ({ page }) => {
+    await page.locator('button[title="Project Files"]').click()
+    await expect(page.getByText(/project files/i).first()).toBeVisible({ timeout: 2000 })
+    // Click the close (X) button
+    await page.locator('button[title="Project Files"]').click()
+    await expect(page.getByPlaceholder(/project folder/i)).not.toBeVisible({ timeout: 2000 })
+  })
+
+  test('file browser panel does not obscure the canvas', async ({ page }) => {
+    await page.locator('button[title="Project Files"]').click()
+    await expect(page.locator('.react-flow')).toBeVisible()
+  })
+})
+
 test.describe('Canvas Toolbar', () => {
   test.beforeEach(async ({ page }) => {
     await goToCanvas(page, 'ml')
@@ -30,24 +63,21 @@ test.describe('Canvas Toolbar', () => {
     await expect(runBtn).toBeEnabled({ timeout: 3000 })
   })
 
-  test('Sample button loads nodes onto canvas', async ({ page }) => {
+  test('loading a sample from Samples page populates canvas', async ({ page }) => {
     await expect(page.locator('.react-flow__node')).toHaveCount(0)
-    await page.getByRole('button', { name: /sample/i }).click()
-    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 5000 })
+    await loadSamplePipeline(page)
     const count = await page.locator('.react-flow__node').count()
     expect(count).toBeGreaterThan(3)
   })
 
-  test('Sample button loads edges connecting nodes', async ({ page }) => {
-    await page.getByRole('button', { name: /sample/i }).click()
-    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 5000 })
+  test('sample pipeline has edges connecting nodes', async ({ page }) => {
+    await loadSamplePipeline(page)
     const edges = await page.locator('.react-flow__edge').count()
     expect(edges).toBeGreaterThan(0)
   })
 
   test('node and edge counter updates after loading sample', async ({ page }) => {
-    await page.getByRole('button', { name: /sample/i }).click()
-    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 5000 })
+    await loadSamplePipeline(page)
     // Counter should show more than 0 nodes
     await expect(page.getByText(/[1-9]\d* nodes/i)).toBeVisible({ timeout: 3000 })
   })

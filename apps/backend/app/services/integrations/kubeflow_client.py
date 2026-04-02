@@ -6,7 +6,7 @@ from __future__ import annotations
 _KFP_TIMEOUT = 15
 
 
-def _get_kfp_client(host: str, token: str = ""):
+def _get_kfp_client(host: str, token: str = "", namespace: str = "kubeflow"):
     try:
         import kfp  # noqa: PLC0415
     except ImportError as exc:
@@ -14,17 +14,18 @@ def _get_kfp_client(host: str, token: str = ""):
             "kfp is not installed. Install it with: pip install kfp"
         ) from exc
     try:
-        kwargs: dict = {"host": host}
+        # Providing namespace makes kfp.Client skip the get_kfp_healthz()
+        # retry loop (5 attempts × 5 s = 25 s) that fires when namespace is
+        # empty.  On Kind/Istio setups the healthz endpoint is behind auth and
+        # always times out before auth is applied, so skipping it is correct.
+        kwargs: dict = {"host": host, "namespace": namespace}
         if token:
             # Strip whitespace and any non-latin-1 characters that sneak in
             # via copy-paste (e.g. ellipsis U+2026 from terminal truncation).
-            # Real authservice_session / bearer tokens are ASCII-only so this
-            # is safe and avoids UnicodeEncodeError in http.client.putheader.
             clean_token = "".join(c for c in token.strip() if ord(c) < 256)
 
             # Full KFP installs with oauth2-proxy/Istio use a session cookie;
-            # bare KFP installs accept a Bearer token.  Try cookie auth first —
-            # it's the more common case when the healthz page returns HTML.
+            # bare KFP installs accept a Bearer token.
             if _is_oauth_protected(host):
                 kwargs["cookies"] = f"authservice_session={clean_token}"
             else:

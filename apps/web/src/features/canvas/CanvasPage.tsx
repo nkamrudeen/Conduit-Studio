@@ -31,6 +31,7 @@ export function CanvasPage() {
   const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
   const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
   const [kubeflowToken, setKubeflowToken] = useState('')
+  const [kubeflowNamespace, setKubeflowNamespace] = useState('kubeflow')
 
   // Switch pipeline mode when URL changes
   React.useEffect(() => {
@@ -86,7 +87,7 @@ export function CanvasPage() {
       const res = await fetch(`${getApiBase()}/pipeline/run-kubeflow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, kubeflow_token: kubeflowToken, experiment_name: kubeflowExperiment, env_vars: getIntegrationEnvVars() }),
+        body: JSON.stringify({ dag, kubeflow_host: kubeflowHost, kubeflow_token: kubeflowToken, kubeflow_namespace: kubeflowNamespace, experiment_name: kubeflowExperiment, env_vars: getIntegrationEnvVars() }),
       })
       if (!res.ok) throw new Error(`Backend error ${res.status}: ${await res.text()}`)
       const { run_id } = await res.json()
@@ -99,7 +100,7 @@ export function CanvasPage() {
       setIsRunning(false)
       setShowLogs(false)
     }
-  }, [dag, kubeflowHost, kubeflowToken, kubeflowExperiment, updateNodeStatus])
+  }, [dag, kubeflowHost, kubeflowToken, kubeflowNamespace, kubeflowExperiment, updateNodeStatus])
 
   const handleValidate = useCallback(() => {
     const errors = validatePortTypes(dag, definitionMap)
@@ -274,6 +275,15 @@ export function CanvasPage() {
                   value={kubeflowToken}
                   onChange={(e) => setKubeflowToken(e.target.value)}
                   placeholder="Paste authservice_session value or bearer token…"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Namespace</label>
+                <input
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none font-mono"
+                  value={kubeflowNamespace}
+                  onChange={(e) => setKubeflowNamespace(e.target.value)}
+                  placeholder="kubeflow"
                 />
               </div>
               <div>

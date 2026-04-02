@@ -19,6 +19,7 @@ dependencies = [
     "mlflow>=2.18.0",
     "kfp>=2.16.0",
     "huggingface-hub>=1.8.0",
+    "datasets>=4.8.4",
 ]
 
 [project.optional-dependencies]

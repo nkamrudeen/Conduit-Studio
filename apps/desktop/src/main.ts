@@ -72,11 +72,17 @@ function getBackendDir(): string {
   return path.join(process.resourcesPath, 'backend')
 }
 
+function appendLog(line: string): void {
+  backendLogs.push(line)
+  if (backendLogs.length > 100) backendLogs.shift()
+  console.log(`[backend] ${line}`)
+}
+
 function spawnBackend(): void {
   const backendDir = getBackendDir()
 
   if (!fs.existsSync(backendDir)) {
-    console.warn(`Backend directory not found: ${backendDir}`)
+    appendLog(`ERROR: backend directory not found: ${backendDir}`)
     return
   }
 
@@ -94,7 +100,19 @@ function spawnBackend(): void {
     cmd = path.join(backendDir, exeName)
     args = ['8000']
     cwd = backendDir   // must run from its own dir so relative data files resolve
+
+    // Log exe presence so the error screen can give an actionable hint
+    if (fs.existsSync(cmd)) {
+      appendLog(`exe found: ${cmd}`)
+    } else {
+      appendLog(`ERROR: exe not found: ${cmd}`)
+      appendLog(`Run in apps/backend/:  pyinstaller conduit-backend.spec --clean`)
+      appendLog(`Then rebuild desktop:  pnpm dist`)
+      return   // nothing to spawn — skip straight to the timeout
+    }
   }
+
+  appendLog(`spawning: ${cmd} ${args.join(' ')}`)
 
   backendProcess = spawn(cmd, args, {
     cwd,
@@ -103,6 +121,7 @@ function spawnBackend(): void {
   })
 
   backendProcess.on('error', (err) => {
+    appendLog(`spawn error: ${err.message}`)
     if (isDev) {
       console.log(`uv spawn failed (${err.message}), falling back to python...`)
       const pythonPath = process.platform === 'win32' ? 'python' : 'python3'
@@ -112,8 +131,6 @@ function spawnBackend(): void {
         shell: false,
       })
       attachBackendListeners()
-    } else {
-      console.error(`Failed to start bundled backend: ${err.message}`)
     }
   })
 
@@ -123,21 +140,12 @@ function spawnBackend(): void {
 function attachBackendListeners(): void {
   if (!backendProcess) return
 
-  const appendLog = (line: string) => {
-    backendLogs.push(line)
-    if (backendLogs.length > 100) backendLogs.shift()
-  }
-
   backendProcess.stdout?.on('data', (data: Buffer) => {
-    const line = data.toString().trim()
-    console.log(`[backend] ${line}`)
-    appendLog(line)
+    data.toString().split('\n').filter(Boolean).forEach(appendLog)
   })
 
   backendProcess.stderr?.on('data', (data: Buffer) => {
-    const line = data.toString().trim()
-    console.error(`[backend:err] ${line}`)
-    appendLog(line)
+    data.toString().split('\n').filter(Boolean).forEach(appendLog)
   })
 
   backendProcess.on('exit', (code) => {
@@ -214,43 +222,55 @@ function createWindow(): void {
     <div style="font-size:13px;color:%236b7280">Starting...</div>
     </div></body></html>`)
 
-  waitForBackend('http://localhost:8000/health').then((ready) => {
+  waitForBackend('http://127.0.0.1:8000/health').then((ready) => {
     if (!mainWindow) return
     if (ready) {
       mainWindow.loadURL(`http://127.0.0.1:${webServerPort}/`)
     } else {
-      const logText = backendLogs.length
-        ? backendLogs.slice(-30).join('\n')
-        : 'No output captured — the executable may be missing or blocked by antivirus.'
-
-      const escapedLog = logText
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
-      const backendExe = path.join(getBackendDir(),
-        process.platform === 'win32' ? 'conduit-backend.exe' : 'conduit-backend')
+      const backendDir = getBackendDir()
+      const exeName = process.platform === 'win32' ? 'conduit-backend.exe' : 'conduit-backend'
+      const backendExe = path.join(backendDir, exeName)
+      const pyLogPath = path.join(backendDir, 'conduit-backend.log')
       const exeExists = fs.existsSync(backendExe)
+
+      // Merge Electron-captured logs + Python log file (written by startup.py)
+      let combined = backendLogs.slice()
+      if (fs.existsSync(pyLogPath)) {
+        try {
+          const pyLog = fs.readFileSync(pyLogPath, 'utf-8').trim()
+          if (pyLog) {
+            combined.push('── conduit-backend.log ──')
+            combined.push(...pyLog.split('\n').slice(-40))
+          }
+        } catch { /* ignore */ }
+      }
+
+      const logText = combined.length
+        ? combined.slice(-50).join('\n')
+        : 'No output captured.'
+
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
       const hint = exeExists
-        ? 'The backend executable was found but failed to run.'
-        : `Executable not found at:<br><code style="font-size:10px">${backendExe}</code><br>Run <b>pyinstaller conduit-backend.spec</b> then rebuild the app.`
+        ? `Exe found but crashed. See logs below. Log file: <code>${esc(pyLogPath)}</code>`
+        : `Exe not found: <code>${esc(backendExe)}</code><br>
+           <b>Step 1:</b> <code>cd apps/backend &amp;&amp; pyinstaller conduit-backend.spec --clean</code><br>
+           <b>Step 2:</b> <code>cd ../desktop &amp;&amp; pnpm dist</code>`
 
       mainWindow.loadURL(`data:text/html;charset=utf-8,<!DOCTYPE html><html><body style="margin:0;background:%230a0a0a;
         display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;
         font-family:system-ui;color:%23ef4444;padding:24px;box-sizing:border-box">
-        <div style="max-width:720px;width:100%;text-align:center">
+        <div style="max-width:760px;width:100%;text-align:center">
           <div style="font-size:18px;font-weight:700;margin-bottom:6px">Backend failed to start</div>
-          <div style="font-size:12px;color:%236b7280;margin-bottom:16px">${hint}</div>
+          <div style="font-size:12px;color:%236b7280;margin-bottom:16px;line-height:1.7">${hint}</div>
           <pre style="text-align:left;background:%230f0f1a;border:1px solid %23333;border-radius:8px;
-            padding:12px;font-size:10px;color:%23a1a1aa;overflow:auto;max-height:300px;white-space:pre-wrap">${escapedLog}</pre>
+            padding:12px;font-size:10px;color:%23a1a1aa;overflow:auto;max-height:320px;white-space:pre-wrap">${esc(logText)}</pre>
           <div style="margin-top:16px;display:flex;gap:10px;justify-content:center">
             <button onclick="location.reload()" style="padding:8px 20px;border-radius:6px;
-              background:%237c3aed;color:white;border:none;font-size:13px;cursor:pointer">
-              Retry
-            </button>
-            <button onclick="window.open('mailto:?subject=ConduitCraft+Error&body='+encodeURIComponent(document.querySelector('pre').textContent))"
+              background:%237c3aed;color:white;border:none;font-size:13px;cursor:pointer">Retry</button>
+            <button onclick="navigator.clipboard.writeText(document.querySelector('pre').textContent)"
               style="padding:8px 20px;border-radius:6px;background:%231a1a2e;color:%236b7280;
-              border:1px solid %23333;font-size:13px;cursor:pointer">
-              Copy Logs
-            </button>
+              border:1px solid %23333;font-size:13px;cursor:pointer">Copy Logs</button>
           </div>
         </div></body></html>`)
     }

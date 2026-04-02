@@ -8,7 +8,10 @@ from .base import DataConnector
 
 class LocalConnector(DataConnector):
     async def test_connection(self, config: dict[str, Any]) -> bool:
-        return Path(config["file_path"]).exists()
+        path = config.get("file_path", "")
+        if not path:
+            return False
+        return Path(path).exists()
 
     async def get_schema(self, config: dict[str, Any]) -> list[dict]:
         df = self._read(config, n_rows=0)

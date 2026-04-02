@@ -13,14 +13,13 @@ from kfp.compiler import Compiler
 
 '''
 
-FOOTER = '''
+PIPELINE_HEADER = '''
 
 @dsl.pipeline(name="{name}", description="AI-IDE generated pipeline")
 def pipeline():
-    # TODO: wire component outputs to inputs according to your DAG
-    pass
+'''
 
-
+FOOTER = '''
 if __name__ == "__main__":
     Compiler().compile(pipeline, "pipeline.yaml")
     print("Compiled to pipeline.yaml")
@@ -30,17 +29,30 @@ if __name__ == "__main__":
 def assemble(dag: PipelineDAG, snippets: list[str], packages: list[str]) -> tuple[str, str]:
     filename = dag.name.lower().replace(" ", "_") + "_kubeflow.py"
     header = HEADER.format(name=dag.name, filename=filename)
-    # Wrap each snippet in a kfp component stub
-    components = []
+
+    # Wrap each snippet in a kfp component
+    component_names: list[str] = []
+    components: list[str] = []
     for i, snippet in enumerate(snippets):
         indented = "\n".join(f"    {line}" for line in snippet.splitlines())
-        component_name = f"step_{i + 1}"
+        name = f"step_{i + 1}"
+        component_names.append(name)
         components.append(
             f"@dsl.component(packages_to_install={packages!r})\n"
-            f"def {component_name}():\n"
+            f"def {name}():\n"
             f"{indented}\n"
         )
-    body = "\n\n".join(components)
-    footer = FOOTER.format(name=dag.name)
-    code = header + body + footer
+
+    # Build the pipeline function body — call each component and chain sequentially
+    pipeline_lines: list[str] = []
+    for i, name in enumerate(component_names):
+        if i == 0:
+            pipeline_lines.append(f"    task_{i + 1} = {name}()")
+        else:
+            pipeline_lines.append(f"    task_{i + 1} = {name}().after(task_{i})")
+
+    pipeline_body = PIPELINE_HEADER.format(name=dag.name)
+    pipeline_body += "\n".join(pipeline_lines) + "\n"
+
+    code = header + "\n\n".join(components) + pipeline_body + "\n" + FOOTER
     return code, filename

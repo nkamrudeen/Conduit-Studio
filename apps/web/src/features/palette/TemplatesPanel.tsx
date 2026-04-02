@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
-import { Brain, FlaskConical, Tag, ArrowRight, Zap, Layers, Star, PlusSquare } from 'lucide-react'
+import { Brain, FlaskConical, Tag, ArrowRight, Zap, Layers, Star, PlusSquare, Trash2, BookmarkPlus, X } from 'lucide-react'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea } from '@ai-ide/ui'
 import { ML_TEMPLATES, LLM_TEMPLATES, type TemplateEntry } from '../../data/templates'
+import { useUserTemplateStore, type UserTemplateEntry } from '../../store/userTemplateStore'
 import type { PipelineType, PipelineEdge } from '@ai-ide/types'
 
 interface TemplatesPanelProps {
@@ -28,38 +29,31 @@ function useInsertTemplate() {
   const { dag, addNode, addEdge } = usePipelineStore()
 
   return (entry: TemplateEntry) => {
-    // Find the rightmost X in the existing canvas so we don't overlap
     const xOffset =
       dag.nodes.length > 0
         ? Math.max(...dag.nodes.map((n) => n.position.x)) + 260
         : 60
-
-    // Find the vertical midpoint of existing nodes (or 200 if canvas is empty)
     const yBase =
       dag.nodes.length > 0
-        ? Math.round(
-            dag.nodes.reduce((sum, n) => sum + n.position.y, 0) / dag.nodes.length
-          )
+        ? Math.round(dag.nodes.reduce((sum, n) => sum + n.position.y, 0) / dag.nodes.length)
         : 200
 
-    // Normalise template node Y positions relative to their own midpoint so
-    // the inserted sub-graph is centred at yBase
     const templateYValues = entry.dag.nodes.map((n) => n.position.y)
-    const templateYMid =
-      templateYValues.reduce((a, b) => a + b, 0) / templateYValues.length
+    const templateYMid = templateYValues.reduce((a, b) => a + b, 0) / templateYValues.length
 
-    // Map old template node IDs → new store IDs returned by addNode
     const idMap = new Map<string, string>()
-
     for (const tNode of entry.dag.nodes) {
-      const newId = addNode(tNode.definitionId, {
-        x: xOffset + tNode.position.x - entry.dag.nodes[0].position.x,
-        y: yBase + (tNode.position.y - templateYMid),
-      }, tNode.config)
+      const newId = addNode(
+        tNode.definitionId,
+        {
+          x: xOffset + tNode.position.x - entry.dag.nodes[0].position.x,
+          y: yBase + (tNode.position.y - templateYMid),
+        },
+        tNode.config,
+      )
       idMap.set(tNode.id, newId)
     }
 
-    // Remap edges to new IDs
     for (const tEdge of entry.dag.edges) {
       const newSource = idMap.get(tEdge.source)
       const newTarget = idMap.get(tEdge.target)
@@ -77,23 +71,179 @@ function useInsertTemplate() {
 }
 
 // ---------------------------------------------------------------------------
+// Save-as-template form (inline, shown inside the panel)
+// ---------------------------------------------------------------------------
+const EMOJI_OPTIONS = ['🌲','🚀','🔥','🔗','🦙','🏠','🤖','🧠','⚡','📊','🎯','🛠️','🌐','📑','🔮']
+
+function SaveTemplateForm({ onClose }: { onClose: () => void }) {
+  const { dag } = usePipelineStore()
+  const { save } = useUserTemplateStore()
+
+  const [name, setName] = useState(dag.name)
+  const [description, setDescription] = useState('')
+  const [tagsRaw, setTagsRaw] = useState('')
+  const [complexity, setComplexity] = useState<'Simple' | 'Intermediate' | 'Advanced'>('Simple')
+  const [icon, setIcon] = useState('🎯')
+  const [error, setError] = useState('')
+
+  const handleSave = () => {
+    if (!name.trim()) { setError('Name is required.'); return }
+    if (dag.nodes.length === 0) { setError('Canvas is empty — add some nodes first.'); return }
+
+    save({
+      dag: {
+        ...dag,
+        id: `user-tpl-${crypto.randomUUID()}`,
+        name: name.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      description: description.trim() || name.trim(),
+      tags: tagsRaw.split(',').map((t) => t.trim()).filter(Boolean),
+      complexity,
+      icon,
+    })
+    onClose()
+  }
+
+  return (
+    <div className="border-b border-border bg-muted/40 px-3 py-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-foreground">Save current pipeline as template</span>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X size={13} /></button>
+      </div>
+
+      {/* Icon picker */}
+      <div className="mb-2">
+        <p className="mb-1 text-[10px] text-muted-foreground">Icon</p>
+        <div className="flex flex-wrap gap-1">
+          {EMOJI_OPTIONS.map((e) => (
+            <button
+              key={e}
+              onClick={() => setIcon(e)}
+              className={[
+                'rounded px-1 py-0.5 text-sm leading-none',
+                icon === e ? 'bg-primary/20 ring-1 ring-primary' : 'hover:bg-accent',
+              ].join(' ')}
+            >{e}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Name */}
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Template name"
+        className="mb-1.5 w-full rounded border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+
+      {/* Description */}
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Short description (optional)"
+        rows={2}
+        className="mb-1.5 w-full resize-none rounded border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+
+      {/* Tags */}
+      <input
+        value={tagsRaw}
+        onChange={(e) => setTagsRaw(e.target.value)}
+        placeholder="Tags (comma-separated)"
+        className="mb-1.5 w-full rounded border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+
+      {/* Complexity */}
+      <div className="mb-2.5 flex gap-1">
+        {(['Simple', 'Intermediate', 'Advanced'] as const).map((c) => (
+          <button
+            key={c}
+            onClick={() => setComplexity(c)}
+            className={[
+              'flex-1 rounded py-1 text-[10px] font-medium',
+              complexity === c
+                ? `${COMPLEXITY_COLOR[c]} ring-1 ring-current`
+                : 'bg-muted text-muted-foreground hover:bg-accent',
+            ].join(' ')}
+          >{c}</button>
+        ))}
+      </div>
+
+      {error && <p className="mb-1.5 text-[10px] text-destructive">{error}</p>}
+
+      <button
+        onClick={handleSave}
+        className="flex w-full items-center justify-center gap-1.5 rounded bg-primary px-2 py-1.5 text-[11px] font-medium text-primary-foreground hover:opacity-90"
+      >
+        <BookmarkPlus size={11} />
+        Save Template
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Panel
 // ---------------------------------------------------------------------------
 export function TemplatesPanel({ pipeline }: TemplatesPanelProps) {
-  const templates = pipeline === 'ml' ? ML_TEMPLATES : LLM_TEMPLATES
+  const builtins = pipeline === 'ml' ? ML_TEMPLATES : LLM_TEMPLATES
+  const { templates: userTemplates, remove } = useUserTemplateStore()
+  const userForPipeline = userTemplates.filter((t) => t.dag.pipeline === pipeline)
   const insertTemplate = useInsertTemplate()
+  const [showSaveForm, setShowSaveForm] = useState(false)
 
   return (
-    <ScrollArea className="flex-1">
-      <p className="px-3 pt-2 text-[10px] text-muted-foreground leading-relaxed">
-        Click <strong>Insert</strong> to add a template's nodes into the current canvas without replacing it.
-      </p>
-      <div className="flex flex-col gap-3 px-2 pb-4 pt-2">
-        {templates.map((entry) => (
-          <TemplateCard key={entry.dag.id} entry={entry} onInsert={insertTemplate} />
-        ))}
-      </div>
-    </ScrollArea>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Save-as-template trigger */}
+      {!showSaveForm && (
+        <button
+          onClick={() => setShowSaveForm(true)}
+          className="mx-2 mt-2 flex items-center justify-center gap-1.5 rounded border border-dashed border-border bg-background px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-foreground"
+        >
+          <BookmarkPlus size={11} />
+          Save current pipeline as template…
+        </button>
+      )}
+
+      {showSaveForm && <SaveTemplateForm onClose={() => setShowSaveForm(false)} />}
+
+      <ScrollArea className="flex-1">
+        <p className="px-3 pt-2 text-[10px] text-muted-foreground leading-relaxed">
+          <strong>Insert</strong> adds nodes into your current canvas without replacing it.
+        </p>
+
+        {/* User templates */}
+        {userForPipeline.length > 0 && (
+          <div className="px-2 pt-2">
+            <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Your Templates</p>
+            <div className="flex flex-col gap-2">
+              {userForPipeline.map((entry) => (
+                <TemplateCard
+                  key={entry.id}
+                  entry={entry}
+                  onInsert={insertTemplate}
+                  onDelete={() => remove(entry.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Built-in templates */}
+        <div className="px-2 pt-3">
+          {userForPipeline.length > 0 && (
+            <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Built-in</p>
+          )}
+          <div className="flex flex-col gap-2 pb-4">
+            {builtins.map((entry) => (
+              <TemplateCard key={entry.dag.id} entry={entry} onInsert={insertTemplate} />
+            ))}
+          </div>
+        </div>
+      </ScrollArea>
+    </div>
   )
 }
 
@@ -103,9 +253,11 @@ export function TemplatesPanel({ pipeline }: TemplatesPanelProps) {
 function TemplateCard({
   entry,
   onInsert,
+  onDelete,
 }: {
   entry: TemplateEntry
   onInsert: (e: TemplateEntry) => void
+  onDelete?: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [inserted, setInserted] = useState(false)
@@ -119,7 +271,6 @@ function TemplateCard({
 
   return (
     <div className="rounded-md border border-border bg-background shadow-sm">
-      {/* Header */}
       <button
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-start gap-2 p-2.5 text-left"
@@ -128,65 +279,48 @@ function TemplateCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-xs font-semibold text-foreground">{entry.dag.name}</span>
-            <span
-              className={[
-                'flex shrink-0 items-center gap-0.5 rounded px-1 py-0 text-[9px] font-medium',
-                COMPLEXITY_COLOR[entry.complexity],
-              ].join(' ')}
-            >
+            <span className={['flex shrink-0 items-center gap-0.5 rounded px-1 py-0 text-[9px] font-medium', COMPLEXITY_COLOR[entry.complexity]].join(' ')}>
               {COMPLEXITY_ICON[entry.complexity]}
               {entry.complexity}
             </span>
           </div>
-          <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
-            {entry.description}
-          </p>
+          <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{entry.description}</p>
         </div>
+        {onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            className="mt-0.5 shrink-0 text-muted-foreground/50 hover:text-destructive"
+            title="Delete template"
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
       </button>
 
-      {/* Expanded: node chips + tags + insert button */}
       {expanded && (
         <div className="border-t border-border px-2.5 pb-2.5 pt-2">
-          {/* Mini node list */}
           <div className="mb-2 flex flex-wrap gap-1">
-            {entry.dag.nodes.map((n) => {
-              const short = n.definitionId.split('.').slice(1).join('.')
-              return (
-                <span key={n.id} className="rounded bg-muted px-1 py-0 text-[9px] font-mono text-muted-foreground">
-                  {short}
-                </span>
-              )
-            })}
-          </div>
-
-          {/* Tags */}
-          <div className="mb-2.5 flex flex-wrap gap-1">
-            {entry.tags.map((t) => (
-              <span key={t} className="flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0 text-[9px] text-accent-foreground">
-                <Tag size={7} />
-                {t}
+            {entry.dag.nodes.map((n) => (
+              <span key={n.id} className="rounded bg-muted px-1 py-0 text-[9px] font-mono text-muted-foreground">
+                {n.definitionId.split('.').slice(1).join('.')}
               </span>
             ))}
           </div>
-
+          {entry.tags.length > 0 && (
+            <div className="mb-2.5 flex flex-wrap gap-1">
+              {entry.tags.map((t) => (
+                <span key={t} className="flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-0 text-[9px] text-accent-foreground">
+                  <Tag size={7} />{t}
+                </span>
+              ))}
+            </div>
+          )}
           <button
             onClick={handleInsert}
-            className={[
-              'flex w-full items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-colors',
-              inserted
-                ? 'bg-green-600 text-white'
-                : 'bg-primary text-primary-foreground hover:opacity-90',
-            ].join(' ')}
+            className={['flex w-full items-center justify-center gap-1.5 rounded px-2 py-1.5 text-[11px] font-medium transition-colors', inserted ? 'bg-green-600 text-white' : 'bg-primary text-primary-foreground hover:opacity-90'].join(' ')}
           >
-            {inserted ? (
-              '✓ Inserted'
-            ) : (
-              <>
-                {isLlm ? <Brain size={11} /> : <FlaskConical size={11} />}
-                <PlusSquare size={11} />
-                Insert into canvas
-                <ArrowRight size={11} />
-              </>
+            {inserted ? '✓ Inserted' : (
+              <>{isLlm ? <Brain size={11} /> : <FlaskConical size={11} />}<PlusSquare size={11} />Insert into canvas<ArrowRight size={11} /></>
             )}
           </button>
         </div>

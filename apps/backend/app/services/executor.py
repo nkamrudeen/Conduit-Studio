@@ -1013,7 +1013,11 @@ async def execute_pipeline_kubeflow(
                     )
 
             # 1. Resolve or create the experiment
-            exp_resp = session.get(f"{api}/experiments", timeout=15)
+            exp_resp = session.get(
+                f"{api}/experiments",
+                params={"resource_reference_key.type": "NAMESPACE", "resource_reference_key.id": kubeflow_namespace},
+                timeout=15,
+            )
             _check(exp_resp, "GET /experiments")
             experiments = exp_resp.json().get("experiments") or []
             exp_id = next(
@@ -1023,7 +1027,12 @@ async def execute_pipeline_kubeflow(
             if not exp_id:
                 create_resp = session.post(
                     f"{api}/experiments",
-                    json={"name": experiment_name},
+                    json={
+                        "name": experiment_name,
+                        "resource_references": [
+                            {"key": {"type": "NAMESPACE", "id": kubeflow_namespace}, "relationship": "OWNER"},
+                        ],
+                    },
                     timeout=15,
                 )
                 _check(create_resp, "POST /experiments")

@@ -1001,77 +1001,68 @@ async def execute_pipeline_kubeflow(
                         f"authservice_session={clean_token}"
                     )
 
-            def _raise_kfp_http(resp: "requests.Response", label: str) -> None:
-                """Raise a readable error showing status + body for KFP calls."""
+            # KFP on Kind routes through /pipeline prefix with v1beta1 API
+            api = f"{base}/pipeline/apis/v1beta1"
+
+            def _check(resp: "requests.Response", label: str) -> None:
                 ct = resp.headers.get("content-type", "")
-                body_preview = resp.text[:400] if resp.text else "(empty)"
-                raise RuntimeError(
-                    f"KFP {label} failed — HTTP {resp.status_code}\n"
-                    f"Content-Type: {ct}\n"
-                    f"Body: {body_preview}"
-                )
+                if not resp.ok or "application/json" not in ct:
+                    body = resp.text[:400] if resp.text else "(empty)"
+                    raise RuntimeError(
+                        f"KFP {label} — HTTP {resp.status_code} ({ct})\n{body}"
+                    )
 
             # 1. Resolve or create the experiment
-            exp_resp = session.get(
-                f"{base}/apis/v2beta1/experiments",
-                params={"namespace": kubeflow_namespace},
-                timeout=15,
-            )
-            if not exp_resp.ok:
-                _raise_kfp_http(exp_resp, "GET /experiments")
-            if "application/json" not in exp_resp.headers.get("content-type", ""):
-                _raise_kfp_http(exp_resp, "GET /experiments (non-JSON — likely auth redirect)")
+            exp_resp = session.get(f"{api}/experiments", timeout=15)
+            _check(exp_resp, "GET /experiments")
             experiments = exp_resp.json().get("experiments") or []
             exp_id = next(
-                (e["experiment_id"] for e in experiments if e.get("display_name") == experiment_name),
+                (e["id"] for e in experiments if e.get("name") == experiment_name),
                 None,
             )
             if not exp_id:
                 create_resp = session.post(
-                    f"{base}/apis/v2beta1/experiments",
-                    json={"display_name": experiment_name, "namespace": kubeflow_namespace},
+                    f"{api}/experiments",
+                    json={"name": experiment_name},
                     timeout=15,
                 )
-                create_resp.raise_for_status()
-                exp_id = create_resp.json()["experiment_id"]
+                _check(create_resp, "POST /experiments")
+                exp_id = create_resp.json()["id"]
 
-            # 2. Upload the pipeline YAML and get a pipeline version id
+            # 2. Upload the pipeline YAML (v1beta1 multipart upload)
+            run_label = f"{dag_obj.name} [{run_id[:8]}]"
             with open(yaml_path, "rb") as fh:
                 upload_resp = session.post(
-                    f"{base}/apis/v2beta1/pipelines/upload",
-                    params={
-                        "name": f"{dag_obj.name} [{run_id[:8]}]",
-                        "namespace": kubeflow_namespace,
-                    },
+                    f"{base}/pipeline/apis/v1beta1/pipelines/upload",
+                    params={"name": run_label},
                     files={"uploadfile": (os.path.basename(yaml_path), fh, "application/yaml")},
                     timeout=30,
                 )
-            upload_resp.raise_for_status()
-            pipeline_id = upload_resp.json()["pipeline_id"]
-            version_id = upload_resp.json().get("pipeline_version_id") or upload_resp.json().get("id")
+            _check(upload_resp, "POST /pipelines/upload")
+            upload_data = upload_resp.json()
+            pipeline_id = upload_data["id"]
+            version_id = upload_data.get("default_version", {}).get("id") or pipeline_id
 
             # 3. Create the run
             run_payload = {
-                "display_name": f"{dag_obj.name} [{run_id[:8]}]",
-                "experiment_id": exp_id,
-                "pipeline_version_reference": {
+                "name": run_label,
+                "pipeline_spec": {
                     "pipeline_id": pipeline_id,
-                    "pipeline_version_id": version_id,
                 },
+                "resource_references": [
+                    {"key": {"type": "EXPERIMENT", "id": exp_id}, "relationship": "OWNER"},
+                    {"key": {"type": "PIPELINE_VERSION", "id": version_id}, "relationship": "CREATOR"},
+                ],
             }
-            run_resp = session.post(
-                f"{base}/apis/v2beta1/runs",
-                json=run_payload,
-                timeout=15,
-            )
-            run_resp.raise_for_status()
-            return str(run_resp.json()["run_id"])
+            run_resp = session.post(f"{api}/runs", json=run_payload, timeout=15)
+            _check(run_resp, "POST /runs")
+            return str(run_resp.json()["id"])
 
         kfp_run_id = await asyncio.to_thread(_submit)
         await queue.put({"type": "log", "text": f"[KFP] ✓ Run submitted — ID: {kfp_run_id}", "stream": "stdout"})
         await queue.put({
             "type": "log",
-            "text": f"[KFP] View: {kubeflow_host.rstrip('/')}/#/runs/details/{kfp_run_id}",
+            "text": f"[KFP] View: {kubeflow_host.rstrip('/')}/_/pipeline/#/runs/details/{kfp_run_id}",
             "stream": "stdout",
         })
 

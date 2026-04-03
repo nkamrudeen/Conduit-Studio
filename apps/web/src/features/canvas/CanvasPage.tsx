@@ -31,7 +31,7 @@ export function CanvasPage() {
   const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
   const [kubeflowExperiment, setKubeflowExperiment] = useState('Default')
   const [kubeflowToken, setKubeflowToken] = useState('')
-  const [kubeflowNamespace, setKubeflowNamespace] = useState('kubeflow')
+  const [kubeflowNamespace, setKubeflowNamespace] = useState('kubeflow-user-example-com')
 
   // Switch pipeline mode when URL changes
   React.useEffect(() => {
@@ -278,13 +278,16 @@ export function CanvasPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">Namespace</label>
+                <label className="mb-1 block text-xs text-muted-foreground">
+                  Namespace <span className="text-muted-foreground/50">(your profile namespace, not "kubeflow")</span>
+                </label>
                 <input
                   className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs focus:border-primary focus:outline-none font-mono"
                   value={kubeflowNamespace}
                   onChange={(e) => setKubeflowNamespace(e.target.value)}
-                  placeholder="kubeflow"
+                  placeholder="kubeflow-user-example-com"
                 />
+                <p className="mt-1 text-[10px] text-muted-foreground/60 font-mono select-all">kubectl get profile --no-headers | awk '{"{print $1}"}'</p>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">Experiment Name</label>

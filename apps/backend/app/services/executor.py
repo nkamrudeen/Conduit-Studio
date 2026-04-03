@@ -981,19 +981,25 @@ async def execute_pipeline_kubeflow(
 
             session = requests.Session()
             if clean_token:
+                # Parse the host to get the domain for cookie binding
+                from urllib.parse import urlparse as _urlparse  # noqa: PLC0415
+                _host_domain = _urlparse(kubeflow_host).hostname or "localhost"
+
                 # Detect token type:
                 # - JWT (two dots) → send as Authorization: Bearer header only
                 # - Everything else (oauth2_proxy / authservice session cookie)
-                #   → send as both cookie names; do NOT set Bearer header as
-                #   Istio/Envoy rejects non-JWT values with 401
+                #   → set as Cookie header string directly (requests.Session
+                #   .cookies.set without a domain silently skips the cookie)
                 is_jwt = clean_token.count(".") == 2
                 if is_jwt:
                     session.headers["Authorization"] = f"Bearer {clean_token}"
                 else:
-                    # oauth2_proxy_kubeflow — oauth2-proxy on Kind installs
-                    # authservice_session   — kubeflow/oidc-authservice installs
-                    session.cookies.set("oauth2_proxy_kubeflow", clean_token)
-                    session.cookies.set("authservice_session", clean_token)
+                    # Send both common cookie names as a raw Cookie header so
+                    # they are included regardless of domain matching rules.
+                    session.headers["Cookie"] = (
+                        f"oauth2_proxy_kubeflow={clean_token}; "
+                        f"authservice_session={clean_token}"
+                    )
 
             # 1. Resolve or create the experiment
             exp_resp = session.get(

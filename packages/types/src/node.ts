@@ -55,4 +55,6 @@ export interface NodeDefinition {
   requiredPackages: string[]
   /** If true, the Inspector shows a Playground tab for live prompt testing */
   supportsPlayground?: boolean
+  /** If true, the node is hidden from the palette (untested / work-in-progress) */
+  disabled?: boolean
 }

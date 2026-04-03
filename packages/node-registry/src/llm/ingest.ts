@@ -65,5 +65,6 @@ export const llmIngestNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'llm/ingest_s3_docs',
     requiredPackages: ['langchain', 'boto3'],
+    disabled: true,
   },
 ]

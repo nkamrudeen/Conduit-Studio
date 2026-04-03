@@ -68,6 +68,7 @@ export const mlIngestNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'ml/ingest_s3',
     requiredPackages: ['pandas', 'boto3', 's3fs'],
+    disabled: true,
   },
   {
     id: 'ml.ingest.azure',
@@ -91,6 +92,7 @@ export const mlIngestNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'ml/ingest_azure',
     requiredPackages: ['pandas', 'azure-storage-blob'],
+    disabled: true,
   },
   {
     id: 'ml.ingest.gcs',

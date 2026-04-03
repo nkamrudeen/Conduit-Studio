@@ -250,7 +250,7 @@ export function CanvasPage() {
               <p className="font-medium text-blue-300">Required: port-forward the Istio ingress gateway</p>
               <p className="font-mono text-[10px] text-blue-200/70 select-all">kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80</p>
               <p className="mt-1 font-medium text-blue-300">Get your auth token</p>
-              <p className="text-blue-300/70"><span className="font-semibold">Recommended:</span> Open KFP UI in browser → DevTools (F12) → Application → Cookies → copy <span className="font-mono">authservice_session</span></p>
+              <p className="text-blue-300/70"><span className="font-semibold">Recommended:</span> Open KFP UI in browser → DevTools (F12) → Application → Cookies → copy <span className="font-mono">oauth2_proxy_kubeflow</span> <span className="opacity-60">(or <span className="font-mono">authservice_session</span> on older installs)</span></p>
               <p className="mt-1 text-blue-300/60">Or create a service account token:<br />
                 <span className="font-mono text-[10px] select-all">kubectl -n kubeflow create token ml-pipeline</span></p>
             </div>

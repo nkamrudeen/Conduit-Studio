@@ -981,7 +981,11 @@ async def execute_pipeline_kubeflow(
 
             session = requests.Session()
             if clean_token:
-                # authservice_session cookie (Dex/Istio) OR bearer token
+                # Set both common cookie names — the proxy keeps whichever it
+                # issued; the unused one is ignored.
+                # oauth2_proxy_kubeflow — used by oauth2-proxy on Kind installs
+                # authservice_session   — used by kubeflow/oidc-authservice
+                session.cookies.set("oauth2_proxy_kubeflow", clean_token)
                 session.cookies.set("authservice_session", clean_token)
                 session.headers["Authorization"] = f"Bearer {clean_token}"
 

@@ -7,4 +7,4 @@ _hf_dataset_{{ node_id }} = load_dataset(
     split="{{ config.split | default('train') }}",
 )
 df_{{ node_id }} = _hf_dataset_{{ node_id }}.to_pandas()
-print(f"[HuggingFace] Loaded '{config.dataset_name}' — {len(df_{{ node_id }})} rows")
+print(f"[HuggingFace] Loaded '{{ config.dataset_name }}' — {len(df_{{ node_id }})} rows")

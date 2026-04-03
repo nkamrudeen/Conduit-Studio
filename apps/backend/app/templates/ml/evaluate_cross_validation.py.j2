@@ -15,7 +15,7 @@ _cv_scores_{{ node_id }} = cross_val_score(
     scoring="{{ config.scoring | default('accuracy') }}",
     n_jobs=-1,
 )
-print(f"[Cross-Val] {{{ config.cv | default(5) }}}-fold {config.scoring | default('accuracy')}: "
+print(f"[Cross-Val] {{ config.cv | default(5) }}-fold {{ config.scoring | default('accuracy') }}: "
       f"{_cv_scores_{{ node_id }}.mean():.4f} ± {_cv_scores_{{ node_id }}.std():.4f}")
 metrics_{{ node_id }} = {
     "cv_mean": float(_cv_scores_{{ node_id }}.mean()),

@@ -981,13 +981,19 @@ async def execute_pipeline_kubeflow(
 
             session = requests.Session()
             if clean_token:
-                # Set both common cookie names — the proxy keeps whichever it
-                # issued; the unused one is ignored.
-                # oauth2_proxy_kubeflow — used by oauth2-proxy on Kind installs
-                # authservice_session   — used by kubeflow/oidc-authservice
-                session.cookies.set("oauth2_proxy_kubeflow", clean_token)
-                session.cookies.set("authservice_session", clean_token)
-                session.headers["Authorization"] = f"Bearer {clean_token}"
+                # Detect token type:
+                # - JWT (two dots) → send as Authorization: Bearer header only
+                # - Everything else (oauth2_proxy / authservice session cookie)
+                #   → send as both cookie names; do NOT set Bearer header as
+                #   Istio/Envoy rejects non-JWT values with 401
+                is_jwt = clean_token.count(".") == 2
+                if is_jwt:
+                    session.headers["Authorization"] = f"Bearer {clean_token}"
+                else:
+                    # oauth2_proxy_kubeflow — oauth2-proxy on Kind installs
+                    # authservice_session   — kubeflow/oidc-authservice installs
+                    session.cookies.set("oauth2_proxy_kubeflow", clean_token)
+                    session.cookies.set("authservice_session", clean_token)
 
             # 1. Resolve or create the experiment
             exp_resp = session.get(

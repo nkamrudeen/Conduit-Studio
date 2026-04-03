@@ -54,7 +54,7 @@ export function LogPanel({ runId, onClose }: LogPanelProps) {
         if (msg.type === 'node_output' && msg.node_id && Array.isArray(msg.outputs)) {
           updateNodeResult(msg.node_id, {
             outputs: msg.outputs as import('@ai-ide/types').NodeOutputPreview[],
-            durationMs: msg.durationMs,
+            ...(msg.durationMs !== undefined && { durationMs: msg.durationMs }),
           })
           // Don't push node_output into the visible log entries
           return

@@ -46,7 +46,7 @@ function useInsertTemplate() {
       const newId = addNode(
         tNode.definitionId,
         {
-          x: xOffset + tNode.position.x - entry.dag.nodes[0].position.x,
+          x: xOffset + tNode.position.x - (entry.dag.nodes[0]?.position.x ?? 0),
           y: yBase + (tNode.position.y - templateYMid),
         },
         tNode.config,

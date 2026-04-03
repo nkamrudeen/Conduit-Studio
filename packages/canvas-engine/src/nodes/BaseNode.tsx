@@ -194,7 +194,7 @@ export function BaseNode({ data, selected }: NodeProps) {
           <p style={{ fontSize: 10, color: '#22c55e', marginTop: 4 }}>✓ Done</p>
         )}
         {result && result.outputs.length > 0 && (
-          <OutputPreview outputs={result.outputs} durationMs={result.durationMs} />
+          <OutputPreview outputs={result.outputs} {...(result.durationMs !== undefined && { durationMs: result.durationMs })} />
         )}
       </div>
 

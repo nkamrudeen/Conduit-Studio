@@ -1001,13 +1001,26 @@ async def execute_pipeline_kubeflow(
                         f"authservice_session={clean_token}"
                     )
 
+            def _raise_kfp_http(resp: "requests.Response", label: str) -> None:
+                """Raise a readable error showing status + body for KFP calls."""
+                ct = resp.headers.get("content-type", "")
+                body_preview = resp.text[:400] if resp.text else "(empty)"
+                raise RuntimeError(
+                    f"KFP {label} failed — HTTP {resp.status_code}\n"
+                    f"Content-Type: {ct}\n"
+                    f"Body: {body_preview}"
+                )
+
             # 1. Resolve or create the experiment
             exp_resp = session.get(
                 f"{base}/apis/v2beta1/experiments",
                 params={"namespace": kubeflow_namespace},
                 timeout=15,
             )
-            exp_resp.raise_for_status()
+            if not exp_resp.ok:
+                _raise_kfp_http(exp_resp, "GET /experiments")
+            if "application/json" not in exp_resp.headers.get("content-type", ""):
+                _raise_kfp_http(exp_resp, "GET /experiments (non-JSON — likely auth redirect)")
             experiments = exp_resp.json().get("experiments") or []
             exp_id = next(
                 (e["experiment_id"] for e in experiments if e.get("display_name") == experiment_name),

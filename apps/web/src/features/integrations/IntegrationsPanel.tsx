@@ -49,7 +49,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
         label: 'Bearer Token (if auth enabled)',
         placeholder: 'Paste token here…',
         type: 'password',
-        hint: 'kubectl -n kubeflow create token default || kubectl -n kubeflow get sa',
+        hint: 'Browser: DevTools → Application → Cookies → authservice_session  |  kubectl: kubectl -n kubeflow create token ml-pipeline',
       },
     ],
     testEndpoint: '/integrations/test/kubeflow',

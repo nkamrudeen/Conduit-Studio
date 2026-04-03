@@ -1065,7 +1065,11 @@ async def execute_pipeline_kubeflow(
             }
             run_resp = session.post(f"{api}/runs", json=run_payload, timeout=15)
             _check(run_resp, "POST /runs")
-            return str(run_resp.json()["id"])
+            run_data = run_resp.json()
+            # v1beta1 run object: top-level key is "run" containing the run details
+            run_obj = run_data.get("run") or run_data
+            run_id_str = run_obj.get("id") or run_obj.get("run_id") or str(run_data)
+            return run_id_str
 
         kfp_run_id = await asyncio.to_thread(_submit)
         await queue.put({"type": "log", "text": f"[KFP] ✓ Run submitted — ID: {kfp_run_id}", "stream": "stdout"})

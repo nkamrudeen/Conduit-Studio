@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
-import { Play, Square, RotateCcw, FolderOpen, Download, Save, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud, Folder, X, AlertCircle } from 'lucide-react'
+import { Play, Square, RotateCcw, FolderOpen, Download, Save, ChevronDown, Box, ShieldCheck, Cpu, Package, Cloud, Folder, X, AlertCircle, ScanSearch } from 'lucide-react'
 import { Button } from '@ai-ide/ui'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { useProjectStore } from '../../store/projectStore'
@@ -16,6 +16,7 @@ interface CanvasToolbarProps {
   onRunKubeflow?: () => void
   onStop?: () => void
   onValidate?: () => void
+  onAnalyze?: () => void
   isRunning?: boolean
   pipelineType?: 'ml' | 'llm'
 }
@@ -90,7 +91,7 @@ function ProjectFolderPrompt({ onClose }: { onClose: () => void }) {
 // ---------------------------------------------------------------------------
 // Main toolbar
 // ---------------------------------------------------------------------------
-export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerInstall, onRunKubeflow, onStop, onValidate, isRunning, pipelineType }: CanvasToolbarProps) {
+export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerInstall, onRunKubeflow, onStop, onValidate, onAnalyze, isRunning, pipelineType }: CanvasToolbarProps) {
   const { dag, setDag, resetPipeline } = usePipelineStore()
   const { projectFolder } = useProjectStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -242,6 +243,17 @@ export function CanvasToolbar({ onRun, onRunDocker, onRunInstall, onRunDockerIns
           >
             <ShieldCheck size={11} />
             Validate
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 gap-1 text-xs text-muted-foreground hover:text-blue-400"
+            onClick={onAnalyze}
+            disabled={disabled}
+            title="Check package conflicts and estimate costs before running"
+          >
+            <ScanSearch size={11} />
+            Analyze
           </Button>
 
           {/* Run split button */}

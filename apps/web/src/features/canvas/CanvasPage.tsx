@@ -8,6 +8,7 @@ import { NodePalette } from '../palette/NodePalette'
 import { NodeInspector } from '../inspector/NodeInspector'
 import { CodeGenPanel } from '../codegen/CodeGenPanel'
 import { CanvasToolbar } from './CanvasToolbar'
+import { AnalysisPanel, type AnalysisResult } from './AnalysisPanel'
 import { LogPanel } from './LogPanel'
 import { AgentPanel } from '../agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
@@ -26,6 +27,8 @@ export function CanvasPage() {
   const [runError, setRunError] = useState<string | null>(null)
   const [showAgent, setShowAgent] = useState(false)
   const [validateResult, setValidateResult] = useState<PortTypeError[] | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
 
   const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
   const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
@@ -107,6 +110,24 @@ export function CanvasPage() {
     setValidateResult(errors)
   }, [dag, definitionMap])
 
+  const handleAnalyze = useCallback(async () => {
+    setAnalyzing(true)
+    setAnalysisResult(null)
+    try {
+      const res = await fetch(`${getApiBase()}/analyze/pipeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dag),
+      })
+      if (!res.ok) throw new Error(`Analyze error ${res.status}`)
+      setAnalysisResult(await res.json())
+    } catch (err) {
+      setRunError(String(err))
+    } finally {
+      setAnalyzing(false)
+    }
+  }, [dag])
+
   const handleStop = useCallback(async () => {
     setIsRunning(false)
   }, [])
@@ -150,6 +171,7 @@ export function CanvasPage() {
           onRunKubeflow={handleRunKubeflow}
           onStop={handleStop}
           onValidate={handleValidate}
+          onAnalyze={handleAnalyze}
           isRunning={isRunning}
           pipelineType={pipelineType}
         />
@@ -160,6 +182,16 @@ export function CanvasPage() {
             <span>{runError}</span>
             <button onClick={() => setRunError(null)} className="shrink-0 text-red-400 hover:text-red-300">✕</button>
           </div>
+        )}
+
+        {/* Analyze results panel */}
+        {analyzing && (
+          <div className="flex items-center gap-2 border-b border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs text-blue-400">
+            <span className="animate-pulse">Analyzing pipeline…</span>
+          </div>
+        )}
+        {analysisResult && !analyzing && (
+          <AnalysisPanel result={analysisResult} onClose={() => setAnalysisResult(null)} />
         )}
 
         {/* Validate results panel */}

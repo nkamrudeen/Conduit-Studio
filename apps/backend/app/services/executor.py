@@ -968,17 +968,75 @@ async def execute_pipeline_kubeflow(
 
         await queue.put({"type": "log", "text": f"[KFP] Submitting to {kubeflow_host} (experiment: {experiment_name})…", "stream": "stdout"})
 
-        # ── 4. Submit via KFP SDK (blocking → run in thread) ─────────────
+        # ── 4. Submit via KFP v2 REST API directly ───────────────────────
+        # We bypass kfp.Client entirely because its __init__ always calls
+        # get_kfp_healthz() which fails behind Istio/oauth2-proxy regardless
+        # of the namespace kwarg in some SDK versions.
         def _submit() -> str:
-            from app.services.integrations.kubeflow_client import _get_kfp_client  # noqa: PLC0415
-            client = _get_kfp_client(kubeflow_host, kubeflow_token, kubeflow_namespace)
-            run_info = client.create_run_from_pipeline_package(
-                pipeline_file=yaml_path,
-                arguments={},
-                run_name=f"{dag_obj.name} [{run_id[:8]}]",
-                experiment_name=experiment_name,
+            import json as _json  # noqa: PLC0415
+            import requests  # noqa: PLC0415
+
+            base = kubeflow_host.rstrip("/")
+            clean_token = "".join(c for c in kubeflow_token.strip() if ord(c) < 256)
+
+            session = requests.Session()
+            if clean_token:
+                # authservice_session cookie (Dex/Istio) OR bearer token
+                session.cookies.set("authservice_session", clean_token)
+                session.headers["Authorization"] = f"Bearer {clean_token}"
+
+            # 1. Resolve or create the experiment
+            exp_resp = session.get(
+                f"{base}/apis/v2beta1/experiments",
+                params={"namespace": kubeflow_namespace},
+                timeout=15,
             )
-            return str(run_info.run_id)
+            exp_resp.raise_for_status()
+            experiments = exp_resp.json().get("experiments") or []
+            exp_id = next(
+                (e["experiment_id"] for e in experiments if e.get("display_name") == experiment_name),
+                None,
+            )
+            if not exp_id:
+                create_resp = session.post(
+                    f"{base}/apis/v2beta1/experiments",
+                    json={"display_name": experiment_name, "namespace": kubeflow_namespace},
+                    timeout=15,
+                )
+                create_resp.raise_for_status()
+                exp_id = create_resp.json()["experiment_id"]
+
+            # 2. Upload the pipeline YAML and get a pipeline version id
+            with open(yaml_path, "rb") as fh:
+                upload_resp = session.post(
+                    f"{base}/apis/v2beta1/pipelines/upload",
+                    params={
+                        "name": f"{dag_obj.name} [{run_id[:8]}]",
+                        "namespace": kubeflow_namespace,
+                    },
+                    files={"uploadfile": (os.path.basename(yaml_path), fh, "application/yaml")},
+                    timeout=30,
+                )
+            upload_resp.raise_for_status()
+            pipeline_id = upload_resp.json()["pipeline_id"]
+            version_id = upload_resp.json().get("pipeline_version_id") or upload_resp.json().get("id")
+
+            # 3. Create the run
+            run_payload = {
+                "display_name": f"{dag_obj.name} [{run_id[:8]}]",
+                "experiment_id": exp_id,
+                "pipeline_version_reference": {
+                    "pipeline_id": pipeline_id,
+                    "pipeline_version_id": version_id,
+                },
+            }
+            run_resp = session.post(
+                f"{base}/apis/v2beta1/runs",
+                json=run_payload,
+                timeout=15,
+            )
+            run_resp.raise_for_status()
+            return str(run_resp.json()["run_id"])
 
         kfp_run_id = await asyncio.to_thread(_submit)
         await queue.put({"type": "log", "text": f"[KFP] ✓ Run submitted — ID: {kfp_run_id}", "stream": "stdout"})

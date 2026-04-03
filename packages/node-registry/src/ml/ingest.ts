@@ -116,6 +116,7 @@ export const mlIngestNodes: NodeDefinition[] = [
     },
     codeTemplateId: 'ml/ingest_gcs',
     requiredPackages: ['pandas', 'google-cloud-storage', 'gcsfs'],
+    disabled: true,
   },
   {
     id: 'ml.ingest.postgres',

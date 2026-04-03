@@ -23,11 +23,11 @@ class NodeRegistry {
   }
 
   getByPipeline(pipeline: PipelineType): NodeDefinition[] {
-    return this.getAll().filter((d) => d.pipeline === pipeline && !d.disabled)
+    return this.getAll().filter((d) => d.pipeline === pipeline)
   }
 
   getByCategory(category: NodeCategory): NodeDefinition[] {
-    return this.getAll().filter((d) => d.category === category && !d.disabled)
+    return this.getAll().filter((d) => d.category === category)
   }
 
   toMap(): Map<string, NodeDefinition> {
@@ -38,10 +38,9 @@ class NodeRegistry {
     const q = query.toLowerCase()
     return this.getAll().filter(
       (d) =>
-        !d.disabled &&
-        (d.label.toLowerCase().includes(q) ||
-          d.description.toLowerCase().includes(q) ||
-          d.id.toLowerCase().includes(q))
+        d.label.toLowerCase().includes(q) ||
+        d.description.toLowerCase().includes(q) ||
+        d.id.toLowerCase().includes(q)
     )
   }
 }

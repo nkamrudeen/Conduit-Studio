@@ -21,6 +21,7 @@ interface IntegrationConfig {
   testEndpoint?: string
   testParams?: (cfg: Record<string, string>) => Record<string, string | undefined>
   docsUrl?: string
+  disabled?: boolean
 }
 
 const INTEGRATIONS: IntegrationConfig[] = [
@@ -111,6 +112,30 @@ const INTEGRATIONS: IntegrationConfig[] = [
       default_bucket: cfg['default_bucket'],
     }),
     docsUrl: 'https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html',
+    disabled: true,
+  },
+  {
+    label: 'Azure Blob Storage',
+    icon: '🔷',
+    description: 'Load files from Azure Blob Storage into your pipeline.',
+    fields: [
+      { key: 'connection_string', label: 'Connection String', placeholder: 'DefaultEndpointsProtocol=https;…', type: 'password', envVar: 'AZURE_STORAGE_CONNECTION_STRING' },
+      { key: 'default_container', label: 'Default Container (optional)', placeholder: 'my-container' },
+    ],
+    docsUrl: 'https://learn.microsoft.com/en-us/azure/storage/blobs/',
+    disabled: true,
+  },
+  {
+    label: 'Google Cloud Storage',
+    icon: '🌐',
+    description: 'Load files from GCS buckets into your pipeline.',
+    fields: [
+      { key: 'project_id', label: 'GCP Project ID', placeholder: 'my-gcp-project', envVar: 'GOOGLE_CLOUD_PROJECT' },
+      { key: 'credentials_json', label: 'Service Account Key (JSON path)', placeholder: '/path/to/key.json', envVar: 'GOOGLE_APPLICATION_CREDENTIALS' },
+      { key: 'default_bucket', label: 'Default Bucket (optional)', placeholder: 'my-gcs-bucket' },
+    ],
+    docsUrl: 'https://cloud.google.com/storage/docs/authentication',
+    disabled: true,
   },
 ]
 
@@ -254,21 +279,25 @@ export function IntegrationsPanel() {
             const cfg = configs[integration.label] ?? {}
             const status = statuses[integration.label]
             const isSaved = saved[integration.label]
+            const isDisabled = integration.disabled
 
             return (
-              <div key={integration.label} className="rounded-lg border border-border bg-card p-4">
+              <div key={integration.label} className={['rounded-lg border bg-card p-4', isDisabled ? 'border-border/40 opacity-50 cursor-not-allowed select-none' : 'border-border'].join(' ')}>
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl leading-none">{integration.icon}</span>
+                    <span className={['text-xl leading-none', isDisabled ? 'grayscale' : ''].join(' ')}>{integration.icon}</span>
                     <div>
-                      <p className="text-xs font-semibold">{integration.label}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-semibold">{integration.label}</p>
+                        {isDisabled && <span className="rounded bg-muted px-1 py-px text-[8px] text-muted-foreground font-medium">Coming soon</span>}
+                      </div>
                       <p className="text-[10px] text-muted-foreground">{integration.description}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {status?.status === 'ok' && <Check size={13} className="text-green-400" />}
-                    {status?.status === 'error' && <X size={13} className="text-red-400" />}
+                    {!isDisabled && status?.status === 'ok' && <Check size={13} className="text-green-400" />}
+                    {!isDisabled && status?.status === 'error' && <X size={13} className="text-red-400" />}
                     {integration.docsUrl && (
                       <a href={integration.docsUrl} target="_blank" rel="noreferrer"
                         className="text-muted-foreground hover:text-foreground">
@@ -311,14 +340,14 @@ export function IntegrationsPanel() {
 
                 {/* Actions */}
                 <div className="mt-3 flex gap-1.5">
-                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleSave(integration)}>
+                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleSave(integration)} disabled={isDisabled}>
                     {isSaved ? <><Check size={10} /> Saved</> : 'Save'}
                   </Button>
                   {integration.testEndpoint && (
                     <Button
                       size="sm" variant="ghost" className="h-6 text-xs text-muted-foreground"
                       onClick={() => handleTest(integration)}
-                      disabled={status?.status === 'testing'}
+                      disabled={isDisabled || status?.status === 'testing'}
                     >
                       {status?.status === 'testing'
                         ? <><Loader2 size={10} className="animate-spin" /> Testing…</>

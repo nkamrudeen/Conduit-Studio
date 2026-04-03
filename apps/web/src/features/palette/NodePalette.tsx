@@ -129,8 +129,22 @@ export function NodePalette({ pipeline }: NodePaletteProps) {
 
 function NodeCard({ node }: { node: NodeDefinition }) {
   const handleDragStart = (e: React.DragEvent) => {
+    if (node.disabled) { e.preventDefault(); return }
     e.dataTransfer.setData('application/ai-ide-node', node.id)
     e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  if (node.disabled) {
+    return (
+      <div
+        className="flex cursor-not-allowed items-center gap-2 rounded-md border border-border/50 bg-background/40 px-2 py-1.5 text-xs opacity-40 select-none"
+        title="Coming soon — not yet tested"
+      >
+        <span className="text-base leading-none grayscale">{node.icon}</span>
+        <span className="truncate font-medium">{node.label}</span>
+        <span className="ml-auto shrink-0 rounded bg-muted px-1 py-px text-[8px] text-muted-foreground">soon</span>
+      </div>
+    )
   }
 
   return (

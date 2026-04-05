@@ -1,16 +1,19 @@
-import React, { useState } from 'react'
-import { Check, Copy, X, Loader2, ExternalLink } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Check, Copy, X, Loader2, ExternalLink, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { Button, Input, ScrollArea } from '@ai-ide/ui'
 import { getApiBase } from '../../lib/api'
+import { useProjectStore } from '../../store/projectStore'
 
 interface FieldDef {
   key: string
   label: string
   placeholder: string
-  defaultValue?: string   // pre-filled; user can override
-  hint?: string           // copyable command / note shown below the input
+  defaultValue?: string
+  hint?: string
   type?: 'text' | 'password' | 'url'
   envVar?: string
+  /** Vault key to use when envVar is absent for password fields */
+  vaultKey?: string
 }
 
 interface IntegrationConfig {
@@ -50,6 +53,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
         label: 'Bearer Token (if auth enabled)',
         placeholder: 'Paste token here…',
         type: 'password',
+        vaultKey: 'KFP_TOKEN',
         hint: 'Browser: DevTools → Application → Cookies → oauth2_proxy_kubeflow (or authservice_session on older installs)  |  kubectl: kubectl -n kubeflow create token ml-pipeline',
       },
     ],
@@ -131,7 +135,7 @@ const INTEGRATIONS: IntegrationConfig[] = [
     description: 'Load files from GCS buckets into your pipeline.',
     fields: [
       { key: 'project_id', label: 'GCP Project ID', placeholder: 'my-gcp-project', envVar: 'GOOGLE_CLOUD_PROJECT' },
-      { key: 'credentials_json', label: 'Service Account Key (JSON path)', placeholder: '/path/to/key.json', envVar: 'GOOGLE_APPLICATION_CREDENTIALS' },
+      { key: 'credentials_json', label: 'Service Account Key (JSON path)', placeholder: '/path/to/key.json', type: 'password', envVar: 'GOOGLE_APPLICATION_CREDENTIALS' },
       { key: 'default_bucket', label: 'Default Bucket (optional)', placeholder: 'my-gcs-bucket' },
     ],
     docsUrl: 'https://cloud.google.com/storage/docs/authentication',
@@ -139,13 +143,21 @@ const INTEGRATIONS: IntegrationConfig[] = [
   },
 ]
 
-// Build initial defaults from field definitions
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function getVaultKeyForField(field: FieldDef): string | null {
+  if (field.type !== 'password') return null
+  return field.envVar ?? field.vaultKey ?? null
+}
+
 function buildDefaults(): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {}
   for (const integration of INTEGRATIONS) {
     const defaults: Record<string, string> = {}
     for (const field of integration.fields) {
-      if (field.defaultValue) defaults[field.key] = field.defaultValue
+      if (field.defaultValue && field.type !== 'password') {
+        defaults[field.key] = field.defaultValue
+      }
     }
     if (Object.keys(defaults).length) out[integration.label] = defaults
   }
@@ -158,7 +170,6 @@ function loadConfig(): Record<string, Record<string, string>> {
   const defaults = buildDefaults()
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-    // Merge: saved values win over defaults, but defaults fill in missing keys
     const merged: Record<string, Record<string, string>> = { ...defaults }
     for (const [label, vals] of Object.entries(saved)) {
       merged[label] = { ...(defaults[label] ?? {}), ...(vals as Record<string, string>) }
@@ -170,7 +181,19 @@ function loadConfig(): Record<string, Record<string, string>> {
 }
 
 function saveConfig(config: Record<string, Record<string, string>>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
+  // Strip password fields before saving to localStorage
+  const clean: Record<string, Record<string, string>> = {}
+  for (const [label, vals] of Object.entries(config)) {
+    const integration = INTEGRATIONS.find((i) => i.label === label)
+    if (!integration) { clean[label] = vals; continue }
+    const stripped: Record<string, string> = {}
+    for (const [k, v] of Object.entries(vals)) {
+      const field = integration.fields.find((f) => f.key === k)
+      if (!field || field.type !== 'password') stripped[k] = v
+    }
+    if (Object.keys(stripped).length) clean[label] = stripped
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(clean))
 }
 
 interface ConnectionStatus {
@@ -178,7 +201,8 @@ interface ConnectionStatus {
   message?: string
 }
 
-// Copyable command line
+// ── CopyLine ───────────────────────────────────────────────────────────────
+
 function CopyLine({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   const copy = () => {
@@ -197,9 +221,7 @@ function CopyLine({ text }: { text: string }) {
   )
 }
 
-// Multi-step hint block — shows labelled copyable commands
 function CopyHint({ text }: { text: string }) {
-  // If text contains " || " treat as multi-step hints separated by that delimiter
   const steps = text.split(' || ')
   if (steps.length === 1) return <div className="mt-1"><CopyLine text={text} /></div>
 
@@ -223,10 +245,136 @@ function CopyHint({ text }: { text: string }) {
   )
 }
 
+// ── VaultField — password fields stored in the Secrets Vault ──────────────
+
+interface VaultFieldProps {
+  field: FieldDef
+  vaultKey: string
+  vaultDir: string
+  storedNames: string[]
+  onStored: () => void
+  disabled: boolean
+}
+
+function VaultField({ field, vaultKey, vaultDir, storedNames, onStored, disabled }: VaultFieldProps) {
+  const isStored = storedNames.includes(vaultKey)
+  const [value, setValue] = useState('')
+  const [show, setShow] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSave = async () => {
+    if (!value.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`${getApiBase()}/vault/set`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vault_dir: vaultDir, name: vaultKey, value: value.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok && data.ok) {
+        setValue('')
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+        onStored()
+      } else {
+        setError(data.detail ?? 'Failed to save')
+      }
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={disabled ? 'opacity-50 pointer-events-none' : ''}>
+      <div className="mb-0.5 flex items-center gap-1.5">
+        <label className="text-[11px] font-medium">{field.label}</label>
+        <span className="rounded bg-purple-500/20 px-1 py-0 text-[9px] font-semibold text-purple-400 flex items-center gap-0.5">
+          <KeyRound size={8} /> vault
+        </span>
+        {isStored && (
+          <span className="flex items-center gap-0.5 rounded bg-green-500/20 px-1 py-0 text-[9px] font-medium text-green-400">
+            <ShieldCheck size={8} /> stored as ${vaultKey}
+          </span>
+        )}
+        {!isStored && (
+          <span className="text-[9px] text-muted-foreground italic">not set</span>
+        )}
+      </div>
+
+      <div className="flex gap-1">
+        <div className="relative flex-1">
+          <input
+            type={show ? 'text' : 'password'}
+            className="h-7 w-full rounded-md border border-input bg-background px-2 pr-7 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            placeholder={isStored ? '••••••••  (leave blank to keep current)' : field.placeholder}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+          />
+          <button
+            type="button"
+            onClick={() => setShow((v) => !v)}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {show ? <EyeOff size={11} /> : <Eye size={11} />}
+          </button>
+        </div>
+        <Button
+          size="sm"
+          variant={saved ? 'default' : 'outline'}
+          className={['h-7 text-xs', saved ? 'bg-green-600 text-white border-green-600' : ''].join(' ')}
+          onClick={handleSave}
+          disabled={saving || !value.trim()}
+        >
+          {saving ? <Loader2 size={10} className="animate-spin" /> : saved ? <Check size={10} /> : 'Save'}
+        </Button>
+      </div>
+
+      {error && <p className="mt-0.5 text-[10px] text-red-400">{error}</p>}
+      {!error && (
+        <p className="mt-0.5 text-[9px] text-muted-foreground">
+          Encrypted in vault · used in generated code as{' '}
+          <code className="font-mono">os.environ["{vaultKey}"]</code>
+        </p>
+      )}
+      {field.hint && <CopyHint text={field.hint} />}
+    </div>
+  )
+}
+
+// ── Main panel ─────────────────────────────────────────────────────────────
+
 export function IntegrationsPanel() {
+  const { projectFolder } = useProjectStore()
+  const vaultDir = projectFolder ?? '~/.conduitcraft/vault'
+
   const [configs, setConfigs] = useState<Record<string, Record<string, string>>>(loadConfig)
   const [statuses, setStatuses] = useState<Record<string, ConnectionStatus>>({})
   const [saved, setSaved] = useState<Record<string, boolean>>({})
+  const [storedNames, setStoredNames] = useState<string[]>([])
+
+  // Load vault secret names on mount and after any vault save
+  const refreshVaultNames = async () => {
+    try {
+      const res = await fetch(`${getApiBase()}/vault/list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vault_dir: vaultDir }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setStoredNames(data.names ?? [])
+      }
+    } catch { /* backend may not be running */ }
+  }
+
+  useEffect(() => { refreshVaultNames() }, [vaultDir])
 
   const handleChange = (integrationLabel: string, key: string, value: string) => {
     setConfigs((prev) => ({
@@ -246,7 +394,20 @@ export function IntegrationsPanel() {
     setStatuses((prev) => ({ ...prev, [integration.label]: { status: 'testing' } }))
     try {
       const cfg = configs[integration.label] ?? {}
-      const raw = integration.testParams ? integration.testParams(cfg) : cfg
+
+      // For password fields, load value from vault
+      const vaultSecrets: Record<string, string> = {}
+      for (const field of integration.fields) {
+        const vk = getVaultKeyForField(field)
+        if (vk && storedNames.includes(vk)) {
+          // We don't load the actual value here (vault list only gives names)
+          // Instead we pass the vault reference; backend resolves via its own vault
+          vaultSecrets[field.key] = `$${vk}`
+        }
+      }
+
+      const mergedCfg = { ...cfg, ...vaultSecrets }
+      const raw = integration.testParams ? integration.testParams(mergedCfg) : mergedCfg
       const params = new URLSearchParams(
         Object.fromEntries(Object.entries(raw).filter(([, v]) => v != null && v !== '')) as Record<string, string>
       ).toString()
@@ -269,7 +430,8 @@ export function IntegrationsPanel() {
       <div className="shrink-0 border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">Integrations</h2>
         <p className="text-[11px] text-muted-foreground mt-0.5">
-          Credentials are stored in localStorage. For production use, configure via environment variables.
+          Non-sensitive settings saved in browser storage. API keys and tokens stored encrypted in the{' '}
+          <span className="text-purple-400 font-medium">Secrets Vault</span>.
         </p>
       </div>
 
@@ -281,8 +443,14 @@ export function IntegrationsPanel() {
             const isSaved = saved[integration.label]
             const isDisabled = integration.disabled
 
+            // Check if integration has any non-password fields to show Save button
+            const hasNonSecretFields = integration.fields.some((f) => f.type !== 'password')
+
             return (
-              <div key={integration.label} className={['rounded-lg border bg-card p-4', isDisabled ? 'border-border/40 opacity-50 cursor-not-allowed select-none' : 'border-border'].join(' ')}>
+              <div
+                key={integration.label}
+                className={['rounded-lg border bg-card p-4', isDisabled ? 'border-border/40 opacity-50 cursor-not-allowed select-none' : 'border-border'].join(' ')}
+              >
                 {/* Header */}
                 <div className="mb-3 flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -309,26 +477,44 @@ export function IntegrationsPanel() {
 
                 {/* Fields */}
                 <div className="space-y-2">
-                  {integration.fields.map((field) => (
-                    <div key={field.key}>
-                      <label className="mb-0.5 block text-[11px] font-medium">
-                        {field.label}
-                        {field.envVar && (
-                          <span className="ml-1 text-[9px] text-muted-foreground opacity-60">
-                            env: {field.envVar}
-                          </span>
-                        )}
-                      </label>
-                      <Input
-                        type={field.type ?? 'text'}
-                        className="h-7 text-xs"
-                        placeholder={field.placeholder}
-                        value={cfg[field.key] ?? ''}
-                        onChange={(e) => handleChange(integration.label, field.key, e.target.value)}
-                      />
-                      {field.hint && <CopyHint text={field.hint} />}
-                    </div>
-                  ))}
+                  {integration.fields.map((field) => {
+                    const vaultKey = getVaultKeyForField(field)
+
+                    if (vaultKey) {
+                      return (
+                        <VaultField
+                          key={field.key}
+                          field={field}
+                          vaultKey={vaultKey}
+                          vaultDir={vaultDir}
+                          storedNames={storedNames}
+                          onStored={refreshVaultNames}
+                          disabled={isDisabled ?? false}
+                        />
+                      )
+                    }
+
+                    return (
+                      <div key={field.key}>
+                        <label className="mb-0.5 block text-[11px] font-medium">
+                          {field.label}
+                          {field.envVar && (
+                            <span className="ml-1 text-[9px] text-muted-foreground opacity-60">
+                              env: {field.envVar}
+                            </span>
+                          )}
+                        </label>
+                        <Input
+                          type={field.type ?? 'text'}
+                          className="h-7 text-xs"
+                          placeholder={field.placeholder}
+                          value={cfg[field.key] ?? ''}
+                          onChange={(e) => handleChange(integration.label, field.key, e.target.value)}
+                        />
+                        {field.hint && <CopyHint text={field.hint} />}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* Status message */}
@@ -340,9 +526,11 @@ export function IntegrationsPanel() {
 
                 {/* Actions */}
                 <div className="mt-3 flex gap-1.5">
-                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleSave(integration)} disabled={isDisabled}>
-                    {isSaved ? <><Check size={10} /> Saved</> : 'Save'}
-                  </Button>
+                  {hasNonSecretFields && (
+                    <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleSave(integration)} disabled={isDisabled}>
+                      {isSaved ? <><Check size={10} /> Saved</> : 'Save'}
+                    </Button>
+                  )}
                   {integration.testEndpoint && (
                     <Button
                       size="sm" variant="ghost" className="h-6 text-xs text-muted-foreground"

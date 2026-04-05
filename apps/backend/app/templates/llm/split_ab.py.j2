@@ -1,0 +1,27 @@
+# ── A/B Split (LLM documents) ────────────────────────────────────────────────
+import random as _random_{{ node_id }}
+
+_docs_input_{{ node_id }}   = {{ input_var }}
+_ratio_{{ node_id }}        = {{ config.get('split_ratio', 0.5) }}
+_strategy_{{ node_id }}     = "{{ config.get('strategy', 'random') }}"
+_seed_{{ node_id }}         = {{ config.get('random_seed', 42) }}
+_label_a_{{ node_id }}      = "{{ config.get('branch_a_label', 'baseline') }}"
+_label_b_{{ node_id }}      = "{{ config.get('branch_b_label', 'experiment') }}"
+
+_all_{{ node_id }} = list(_docs_input_{{ node_id }})
+_n_{{ node_id }}   = int(len(_all_{{ node_id }}) * _ratio_{{ node_id }})
+
+if _strategy_{{ node_id }} == "first_n":
+    branch_a_{{ node_id }} = _all_{{ node_id }}[:_n_{{ node_id }}]
+    branch_b_{{ node_id }} = _all_{{ node_id }}[_n_{{ node_id }}:]
+else:  # random
+    _random_{{ node_id }}.seed(_seed_{{ node_id }})
+    _shuffled_{{ node_id }} = _all_{{ node_id }}[:]
+    _random_{{ node_id }}.shuffle(_shuffled_{{ node_id }})
+    branch_a_{{ node_id }} = _shuffled_{{ node_id }}[:_n_{{ node_id }}]
+    branch_b_{{ node_id }} = _shuffled_{{ node_id }}[_n_{{ node_id }}:]
+
+print(
+    f"A/B Split — '{_label_a_{{ node_id }}}': {len(branch_a_{{ node_id }})} docs, "
+    f"'{_label_b_{{ node_id }}}': {len(branch_b_{{ node_id }})} docs"
+)

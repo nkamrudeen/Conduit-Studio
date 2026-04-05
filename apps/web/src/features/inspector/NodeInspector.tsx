@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom'
 import { nodeRegistry } from '@ai-ide/node-registry'
 import { usePipelineStore } from '@ai-ide/canvas-engine'
 import { ScrollArea, Badge } from '@ai-ide/ui'
-import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw, FlaskConical, Settings } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Table, Upload, FileCheck, X, RefreshCw, FlaskConical, Settings, Bug, FileText } from 'lucide-react'
 import { getApiBase } from '../../lib/api'
 import { getNodeIntegrationDefaults } from '../../lib/integrations'
 import { useProjectStore } from '../../store/projectStore'
 import { PromptPlayground } from './PromptPlayground'
+import { RetrievalDebugger } from './RetrievalDebugger'
 import type { JSONSchema7 } from 'json-schema'
 
 // Map node definitionId prefix → connector_id used by the backend API
@@ -31,7 +32,7 @@ export function NodeInspector() {
   const [connTest, setConnTest] = useState<'idle' | 'loading' | 'ok' | 'fail'>('idle')
   const [preview, setPreview] = useState<{ columns: string[]; rows: Record<string, unknown>[] } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'config' | 'playground'>('config')
+  const [activeTab, setActiveTab] = useState<'config' | 'playground' | 'debug'>('config')
 
   useEffect(() => {
     setConfig(node?.config ?? {})
@@ -106,8 +107,8 @@ export function NodeInspector() {
         </Badge>
       </div>
 
-      {/* Tab bar — Config always shown; Playground only for supported nodes */}
-      {definition.supportsPlayground && (
+      {/* Tab bar — Config always shown; extra tabs for supported nodes */}
+      {(definition.supportsPlayground || definition.supportsDebug) && (
         <div className="flex shrink-0 border-b border-border">
           <button
             onClick={() => setActiveTab('config')}
@@ -120,17 +121,32 @@ export function NodeInspector() {
           >
             <Settings size={11} /> Config
           </button>
-          <button
-            onClick={() => setActiveTab('playground')}
-            className={[
-              'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
-              activeTab === 'playground'
-                ? 'border-b-2 border-primary text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            <FlaskConical size={11} /> Playground
-          </button>
+          {definition.supportsPlayground && (
+            <button
+              onClick={() => setActiveTab('playground')}
+              className={[
+                'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
+                activeTab === 'playground'
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              ].join(' ')}
+            >
+              <FlaskConical size={11} /> Playground
+            </button>
+          )}
+          {definition.supportsDebug && (
+            <button
+              onClick={() => setActiveTab('debug')}
+              className={[
+                'flex flex-1 items-center justify-center gap-1 py-1.5 text-[11px] font-medium transition-colors',
+                activeTab === 'debug'
+                  ? 'border-b-2 border-primary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              ].join(' ')}
+            >
+              <Bug size={11} /> Debug
+            </button>
+          )}
         </div>
       )}
 
@@ -138,6 +154,13 @@ export function NodeInspector() {
       {definition.supportsPlayground && activeTab === 'playground' && (
         <ScrollArea className="flex-1">
           <PromptPlayground nodeId={node.id} definition={definition} config={config} />
+        </ScrollArea>
+      )}
+
+      {/* Retrieval Debug tab */}
+      {definition.supportsDebug && activeTab === 'debug' && (
+        <ScrollArea className="flex-1">
+          <RetrievalDebugger nodeId={node.id} definition={definition} config={config} />
         </ScrollArea>
       )}
 
@@ -283,6 +306,11 @@ export function NodeInspector() {
             </div>
           )}
 
+          {/* Model Card generator — deploy nodes only */}
+          {definition.category === 'deploy' && (
+            <ModelCardButton dag={dag} />
+          )}
+
           {/* Inline output results (populated after pipeline run) */}
           {node.result && node.result.outputs.length > 0 && (
             <NodeResultPanel result={node.result} />
@@ -291,6 +319,96 @@ export function NodeInspector() {
       </ScrollArea>
       )}
     </aside>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ModelCardButton — generates MODEL_CARD.md for deploy nodes
+// ---------------------------------------------------------------------------
+
+import type { PipelineDAG } from '@ai-ide/types'
+
+function ModelCardButton({ dag }: { dag: PipelineDAG }) {
+  const { projectFolder } = useProjectStore()
+  const [status, setStatus] = useState<'idle' | 'generating' | 'done' | 'error'>('idle')
+  const [savedPath, setSavedPath] = useState<string | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+
+  const generate = async () => {
+    setStatus('generating')
+    setSavedPath(null)
+    setPreview(null)
+    try {
+      const res = await fetch(`${getApiBase()}/codegen/model-card`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dag, project_folder: projectFolder ?? '' }),
+      })
+      const data = await res.json()
+      if (res.ok && data.ok) {
+        setStatus('done')
+        setSavedPath(data.saved_path)
+        setPreview(data.content?.slice(0, 600))
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
+
+  const download = () => {
+    if (!preview) return
+    const blob = new Blob([preview], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'MODEL_CARD.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="rounded-md border border-border p-2 space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Model Card
+      </p>
+      <button
+        onClick={generate}
+        disabled={status === 'generating'}
+        className="flex w-full items-center justify-center gap-1.5 rounded bg-primary/10 border border-primary/30 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+      >
+        {status === 'generating'
+          ? <><Loader2 size={10} className="animate-spin" /> Generating…</>
+          : <><FileText size={10} /> Generate MODEL_CARD.md</>
+        }
+      </button>
+      {status === 'done' && (
+        <>
+          {savedPath && (
+            <p className="text-[9px] text-green-400 font-mono truncate">
+              Saved: {savedPath}
+            </p>
+          )}
+          {preview && (
+            <div className="space-y-1">
+              <pre className="max-h-32 overflow-y-auto rounded border border-border bg-muted/30 p-1.5 text-[9px] font-mono whitespace-pre-wrap">
+                {preview}{preview.length >= 600 ? '\n…' : ''}
+              </pre>
+              <button
+                onClick={download}
+                className="text-[10px] text-primary hover:underline"
+              >
+                Download MODEL_CARD.md
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {status === 'error' && (
+        <p className="text-[10px] text-red-400">Generation failed. Check backend logs.</p>
+      )}
+    </div>
   )
 }
 

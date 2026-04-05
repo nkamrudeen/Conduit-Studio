@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
 import { Outlet, NavLink } from 'react-router-dom'
-import { FolderTree, GitBranch, Puzzle, Settings, FlaskConical, Brain, Layers, HelpCircle, X } from 'lucide-react'
+import { FolderTree, GitBranch, Puzzle, Settings, FlaskConical, Brain, Layers, HelpCircle, X, CloudUpload } from 'lucide-react'
 import { cn } from '@ai-ide/ui'
 import { IntegrationsPanel } from '../features/integrations/IntegrationsPanel'
 import { SettingsPanel } from '../features/settings/SettingsPanel'
 import { FileBrowserPanel } from '../features/files/FileBrowserPanel'
+import { CloudDeployPanel } from '../features/cloud-deploy/CloudDeployPanel'
 
-type SidePanel = 'integrations' | 'settings' | 'files' | null
+type SidePanel = 'integrations' | 'settings' | 'files' | 'cloud-deploy' | null
 
 export function IDELayout() {
   const [sidePanel, setSidePanel] = useState<SidePanel>(null)
@@ -56,6 +57,16 @@ export function IDELayout() {
           <button
             className={cn(
               'rounded p-1.5 hover:bg-accent hover:text-foreground',
+              sidePanel === 'cloud-deploy' && 'bg-accent text-foreground'
+            )}
+            title="Cloud Deployment"
+            onClick={() => togglePanel('cloud-deploy')}
+          >
+            <CloudUpload size={15} />
+          </button>
+          <button
+            className={cn(
+              'rounded p-1.5 hover:bg-accent hover:text-foreground',
               sidePanel === 'settings' && 'bg-accent text-foreground'
             )}
             title="Settings"
@@ -81,6 +92,7 @@ export function IDELayout() {
             </button>
             {sidePanel === 'files' && <FileBrowserPanel />}
             {sidePanel === 'integrations' && <IntegrationsPanel />}
+            {sidePanel === 'cloud-deploy' && <CloudDeployPanel />}
             {sidePanel === 'settings' && <SettingsPanel />}
           </div>
         )}

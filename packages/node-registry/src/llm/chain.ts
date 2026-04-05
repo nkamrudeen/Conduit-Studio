@@ -29,6 +29,7 @@ export const llmChainNodes: NodeDefinition[] = [
     codeTemplateId: 'llm/chain_rag',
     requiredPackages: ['langchain', 'langchain-core'],
     supportsPlayground: true,
+    supportsDebug: true,
   },
   {
     id: 'llm.chain.react_agent',

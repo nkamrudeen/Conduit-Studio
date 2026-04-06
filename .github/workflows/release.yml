@@ -106,9 +106,13 @@ jobs:
         run: pnpm --filter "@ai-ide/types" --filter "@ai-ide/ui" --filter "@ai-ide/canvas-engine" --filter "@ai-ide/node-registry" build
 
       # ── Electron ──
-      - name: Build & package Electron app
+      - name: Compile Electron TypeScript
         working-directory: apps/desktop
-        run: pnpm dist -- --publish never
+        run: pnpm build
+
+      - name: Package Electron app
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder --publish never
 
       # ── Upload installer ──
       - name: Upload installer artifact

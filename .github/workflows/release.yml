@@ -1,0 +1,182 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Step 1: Build the web app once, share as artifact ──────────────────────
+  build-web:
+    name: Build Web App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web app
+        run: pnpm --filter @ai-ide/web build
+
+      - name: Upload web dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+
+  # ── Step 2: Build backend + Electron per OS ────────────────────────────────
+  build-desktop:
+    name: Build Desktop (${{ matrix.os }})
+    needs: build-web
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: "*.exe"
+          - os: macos-latest
+            platform: mac
+            artifact: "*.dmg"
+          - os: ubuntu-latest
+            platform: linux
+            artifact: "*.AppImage"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Node ──
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # ── Python ──
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: latest
+
+      # ── Restore web build ──
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+      # ── Python backend ──
+      - name: Install Python dependencies
+        working-directory: apps/backend
+        run: uv sync
+
+      - name: Install PyInstaller
+        working-directory: apps/backend
+        run: uv add --dev pyinstaller
+
+      - name: Build PyInstaller bundle
+        working-directory: apps/backend
+        run: uv run pyinstaller conduit-backend.spec --clean --noconfirm
+
+      # ── Node dependencies ──
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Build packages (types, ui, canvas-engine, node-registry) ──
+      - name: Build packages
+        run: pnpm --filter "@ai-ide/types" --filter "@ai-ide/ui" --filter "@ai-ide/canvas-engine" --filter "@ai-ide/node-registry" build
+
+      # ── Electron ──
+      - name: Build & package Electron app
+        working-directory: apps/desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm dist
+
+      # ── Upload installer ──
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}
+          path: apps/desktop/release/${{ matrix.artifact }}
+          retention-days: 7
+
+  # ── Step 3: Create GitHub Release and attach all installers ───────────────
+  release:
+    name: Create GitHub Release
+    needs: build-desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-win
+          path: dist/win
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-mac
+          path: dist/mac
+
+      - name: Download Linux installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-linux
+          path: dist/linux
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ConduitCraft AI ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          generate_release_notes: true
+          files: |
+            dist/win/*.exe
+            dist/mac/*.dmg
+            dist/linux/*.AppImage
+          body: |
+            ## ConduitCraft AI ${{ github.ref_name }}
+
+            ### Downloads
+
+            | Platform | Installer |
+            |---|---|
+            | **Windows** | `.exe` (NSIS installer) |
+            | **macOS** | `.dmg` (drag to Applications) |
+            | **Linux** | `.AppImage` (make executable and run) |
+
+            ### Linux quick start
+            ```bash
+            chmod +x ConduitCraft*.AppImage
+            ./ConduitCraft*.AppImage
+            ```
+
+            See [BUILD.md](BUILD.md) for building from source.

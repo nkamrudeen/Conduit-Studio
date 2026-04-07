@@ -19,15 +19,21 @@ This guide walks you through every feature of ConduitCraft AI from first launch 
 9. [Generating Code](#9-generating-code)
 10. [Running a Pipeline](#10-running-a-pipeline)
 11. [Inline Data Preview](#11-inline-data-preview)
-12. [Saving and Loading Pipelines](#12-saving-and-loading-pipelines)
-13. [Sample Pipelines](#13-sample-pipelines)
-14. [ML vs LLM Pipelines](#14-ml-vs-llm-pipelines)
-15. [Integrations](#15-integrations)
-16. [Plugin Manager](#16-plugin-manager)
-17. [AI Assistant](#17-ai-assistant)
-18. [Settings](#18-settings)
-19. [Keyboard Shortcuts](#19-keyboard-shortcuts)
-20. [Troubleshooting](#20-troubleshooting)
+12. [Prompt Playground](#12-prompt-playground)
+13. [A/B Split & Retrieval Debugger](#13-ab-split--retrieval-debugger)
+14. [Pipeline History & Diff](#14-pipeline-history--diff)
+15. [Secrets Vault](#15-secrets-vault)
+16. [Cloud Deployment](#16-cloud-deployment)
+17. [Experiment Leaderboard](#17-experiment-leaderboard)
+18. [Saving and Loading Pipelines](#18-saving-and-loading-pipelines)
+19. [Sample Pipelines](#19-sample-pipelines)
+20. [ML vs LLM Pipelines](#20-ml-vs-llm-pipelines)
+21. [Integrations](#21-integrations)
+22. [Plugin Manager](#22-plugin-manager)
+23. [AI Assistant](#23-ai-assistant)
+24. [Settings](#24-settings)
+25. [Keyboard Shortcuts](#25-keyboard-shortcuts)
+26. [Troubleshooting](#26-troubleshooting)
 
 ---
 
@@ -209,6 +215,8 @@ Click the **folder icon** in the toolbar (or set a Project Folder in Settings) t
 
 > Code generation requires the backend to be running. Generate before saving — the Save button is disabled until code is generated.
 
+> **Model Card Generator** *(development branch — not yet in main)* — Deploy nodes will include a **Generate Model Card** button in the Inspector once the development branch is merged.
+
 ---
 
 ## 10. Running a Pipeline
@@ -237,6 +245,7 @@ Click the **folder icon** in the toolbar (or set a Project Folder in Settings) t
 
 ## 11. Inline Data Preview
 
+
 After a successful run, each node automatically shows its output directly on the canvas card:
 
 | Output type | What you see on the node |
@@ -253,7 +262,177 @@ Output previews persist until the next run or page refresh.
 
 ---
 
-## 12. Saving and Loading Pipelines
+## 12. Prompt Playground
+
+> **Not yet in main** — this feature is in the development branch and will be available after the next merge.
+
+For LLM and Chain nodes, the Inspector shows a **Playground** tab alongside Config.
+
+1. Click any LLM node (OpenAI, Claude, Ollama) or Chain node (RAG Chain, ReAct Agent) on the canvas.
+2. In the Node Inspector, click the **Playground** tab (flask icon).
+3. Enter a test query in the input area.
+4. Adjust the **Temperature** slider if needed.
+5. Click **Run** — the model's response streams token-by-token into the output area.
+
+### Prompt versioning
+
+| Action | How |
+|---|---|
+| Save prompt | Edit the Prompt Template field → click **Save** — creates v1, v2, … |
+| Switch versions | Click a version in the right-hand list |
+| Diff versions | Select two versions — diffs appear highlighted in the template field |
+| Pin a version | Click **Pin** — this becomes the active prompt used for the node |
+
+The pinned version is stored in the node's `config.prompt_version` and included in generated code.
+
+> Playground requires the backend to be running.
+
+---
+
+## 13. A/B Split & Retrieval Debugger
+
+> **Not yet in main** — this feature is in the development branch and will be available after the next merge.
+
+### A/B Split
+
+The **A/B Split** node (Split category — available for both ML and LLM pipelines) forks execution into two parallel branches.
+
+1. Drag **A/B Split** onto the canvas.
+2. Connect an upstream node to the A/B Split input.
+3. Connect **Branch A** output and **Branch B** output to separate downstream nodes.
+4. In the Inspector, configure:
+   - **Split Strategy** — `random`, `first_n`, or `stratified`
+   - **Split Ratio** — e.g. `50/50`, `80/20`
+   - **Branch Labels** — optional names shown in the Leaderboard
+5. Run the pipeline — both branches execute in parallel (`concurrent.futures`).
+6. Open the **Runs** panel to see side-by-side metrics for both branches.
+
+### Retrieval Debugger
+
+For **RAG Chain** nodes with the Debug tab enabled:
+
+1. Click a RAG Chain node → Inspector → **Debug** tab (bug icon).
+2. Enter a test query and set **Top K** (number of chunks to retrieve).
+3. Click **Run Debug**.
+4. The results panel shows:
+   - **Retrieved chunks** — text + source document + colour-coded similarity score
+   - **Assembled prompt** — the full prompt sent to the LLM (collapsible)
+   - **Model response** — the LLM's answer
+5. Tune **Chunk Size** / **Overlap** in the upstream Splitter node and re-run to improve scores.
+
+> Scores ≥ 0.7 appear green; 0.4–0.7 yellow; below 0.4 red.
+
+---
+
+## 14. Pipeline History & Diff
+
+> **Not yet in main** — this feature is in the development branch and will be available after the next merge.
+
+ConduitCraft AI auto-saves a pipeline snapshot every 30 seconds and on every manual Save. All snapshots are stored in a local SQLite database (7-day retention, 200-snapshot cap).
+
+### Viewing history
+
+1. Click the **History** button in the canvas toolbar (clock icon).
+2. A modal opens with all snapshots listed by timestamp.
+
+### Comparing two snapshots
+
+1. Select snapshot **A** and snapshot **B** from the list.
+2. Click **Compare**.
+3. The diff view renders:
+   - **Green** — nodes added in B
+   - **Red (strikethrough)** — nodes removed in B
+   - **Yellow** — nodes whose config changed between A and B
+4. Hover a yellow node to see a field-by-field config diff (old value → new value).
+
+### Restoring a snapshot
+
+Click **Restore** next to any snapshot. The current canvas is automatically saved as a new snapshot before the restore so you can undo the restore.
+
+---
+
+## 15. Secrets Vault
+
+> **Not yet in main** — this feature is in the development branch and will be available after the next merge.
+
+All sensitive credentials (API keys, tokens, connection strings) are stored **encrypted** (AES-256 Fernet) in your project folder — never in plain localStorage.
+
+### Managing secrets
+
+1. Open **Settings → Secrets** (⚙ icon → **Secrets** tab).
+2. Enter a **Name** (e.g. `OPENAI_API_KEY`) and **Value**, then click **Add Secret**.
+3. Stored secret names are listed; values are write-only.
+4. Click the delete icon to remove a secret.
+
+### How secrets are used
+
+- **Integrations panel** — all password/token fields automatically store to the vault. A purple `vault` badge appears; a green `stored as $KEY` badge confirms storage.
+- **Generated code** — secret references render as `os.environ["KEY"]`. A `.env.example` file is generated alongside listing all required variable names.
+- **At runtime** — the backend injects vault secrets as environment variables into pipeline subprocess execution.
+
+### Storage location
+
+| File | Contents |
+|---|---|
+| `{project_folder}/.secrets.json` | Encrypted secret values (Fernet) |
+| `{project_folder}/.vault.key` | Encryption key (keep private, gitignored) |
+
+> Set a Project Folder in Settings to activate the vault. Both files are automatically added to `.gitignore`.
+
+---
+
+## 16. Cloud Deployment
+
+> **Not yet in main** — this feature is in the development branch and will be available after the next merge.
+
+Submit pipelines to cloud ML platforms directly from the toolbar.
+
+### Opening the panel
+
+Click the **Cloud** icon (upload-cloud) in the top-right toolbar to open the Cloud Deployment side panel.
+
+### Azure ML
+
+1. **Configure workspace** — fill in Subscription ID, Resource Group, Workspace Name, and Tenant ID. Credentials are stored in the Secrets Vault.
+2. Click **Save & Test** to verify the connection.
+3. **Submit a pipeline job:**
+   - Set Compute Target (e.g. `cpu-cluster`) and Experiment Name.
+   - Click **Submit Job** — the job ID appears with a live status badge (Submitted → Running → Completed/Failed). Status polls every 5 seconds.
+4. **Deploy a real-time endpoint:**
+   - Set Endpoint Name, Model Name, and Instance Type.
+   - Click **Deploy** — deployment status polls automatically (typically 5–10 minutes).
+
+> AWS SageMaker and Google Vertex AI tabs are visible but marked "Coming soon."
+
+---
+
+## 17. Experiment Leaderboard
+
+> **Not yet in main** — this feature is in the development branch and will be available after the next merge.
+
+The Experiment Leaderboard shows all past runs of the current pipeline in a sortable metrics table.
+
+### Opening the leaderboard
+
+Click the **Runs** icon (bar chart) in the top bar to open the panel.
+
+### Features
+
+| Feature | How |
+|---|---|
+| View all runs | All runs listed with ID, timestamp, status, duration, and all logged metrics |
+| Sort by metric | Click any column header to sort ascending/descending |
+| Filter | Use the date range picker or metric threshold filter |
+| View run config | Click a run row — the Inspector switches to Run Config mode showing that run's node configs |
+| Compare two runs | Check two runs → click **Compare** — a diff table shows changed config values |
+
+Metric columns are auto-generated from what the nodes logged (accuracy, F1, loss, etc.).
+
+**Data source:** proxies the MLflow Runs API when MLflow is configured; falls back to a local SQLite run log otherwise.
+
+---
+
+## 18. Saving and Loading Pipelines
 
 ### Save / Load
 
@@ -274,7 +453,7 @@ Enable **Auto-save Pipeline** in Settings to persist the pipeline to `localStora
 
 ---
 
-## 13. Sample Pipelines
+## 19. Sample Pipelines
 
 Click the **Samples** tab in the header to browse 10 pre-built pipelines:
 
@@ -295,7 +474,7 @@ Click **Open in Canvas** on any card to load it. The toolbar **Sample** button l
 
 ---
 
-## 14. ML vs LLM Pipelines
+## 20. ML vs LLM Pipelines
 
 Use the **ML Pipeline** and **LLM Pipeline** tabs in the header to switch modes.
 
@@ -313,7 +492,7 @@ Use the **ML Pipeline** and **LLM Pipeline** tabs in the header to switch modes.
 
 ---
 
-## 15. Integrations
+## 21. Integrations
 
 Click **⎇** (top-right header) to open the Integrations panel. Configure API keys and endpoints for all MLOps services.
 
@@ -329,7 +508,7 @@ Click **⎇** (top-right header) to open the Integrations panel. Configure API k
 **For each integration:**
 1. Fields are pre-filled with sensible defaults — change only what is different in your setup.
 2. Click **Test Connection** to verify the service is reachable.
-3. Click **Save** — credentials are stored in `localStorage` (key `conduitcraft:integrations`).
+3. Click **Save** — password/token fields are encrypted and stored in the Secrets Vault; non-sensitive fields are stored in `localStorage`.
 4. Configured values are automatically pre-filled in matching node config fields (shown with an `integration` badge).
 
 ### Kubeflow OAuth2 / Dex
@@ -343,7 +522,7 @@ If your KFP is behind an oauth2-proxy (most full Kubeflow installs), the `/healt
 
 ---
 
-## 16. Plugin Manager
+## 22. Plugin Manager
 
 Click the **Plugins** tab in the header.
 
@@ -356,7 +535,7 @@ Installed plugins are discovered from `~/.conduitcraft/plugins/` at startup.
 
 ---
 
-## 17. AI Assistant
+## 23. AI Assistant
 
 Click **🤖** (top-right header) or the **Assistant** button on the canvas to open the AI Agent panel.
 
@@ -370,7 +549,7 @@ Type your question or request in the text field and press **Enter**.
 
 ---
 
-## 18. Settings
+## 24. Settings
 
 Click **⚙** (top-right header) to open Settings.
 
@@ -386,9 +565,14 @@ Click **⚙** (top-right header) to open Settings.
 | Edge Style | Smooth Step / Bezier / Straight |
 | Plugin Directory | Path scanned for community plugins (desktop only) |
 
+The Settings panel has two tabs:
+
+- **General** — all settings above
+- **Secrets** — manage the encrypted Secrets Vault (add / delete named secrets; see [Section 15](#15-secrets-vault))
+
 ---
 
-## 19. Keyboard Shortcuts
+## 25. Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
@@ -399,7 +583,7 @@ Click **⚙** (top-right header) to open Settings.
 
 ---
 
-## 20. Troubleshooting
+## 26. Troubleshooting
 
 ### "Cannot reach backend" when clicking Run or Generate
 
@@ -463,6 +647,30 @@ Ensure the dev server is running on port 3000 before running Playwright:
 pnpm dev:web &
 cd apps/web && pnpm exec playwright test
 ```
+
+---
+
+### Secrets Vault — "No project folder set"
+
+The vault requires a project folder to know where to write `.secrets.json`. Open Settings (⚙) → set **Project Folder** → click **Save Settings**, then retry.
+
+### Prompt Playground — no response / timeout
+
+- Ensure the backend is running.
+- Verify the API key for the selected LLM is stored in the Secrets Vault.
+- Check the backend logs for LLM API errors (`POST /playground/run`).
+
+### Azure ML — "AuthenticationError"
+
+- Confirm `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID` are in the Secrets Vault.
+- Verify the service principal has **Contributor** role on the Azure ML workspace.
+- Click **Save & Test** in the Cloud Deployment panel to re-validate.
+
+### Pipeline History — snapshots not appearing
+
+- Snapshots require the backend to be running (stored via `POST /history/save`).
+- Auto-save triggers every 30 seconds — wait at least 30s after making a change.
+- Snapshots older than 7 days are pruned automatically.
 
 ---
 

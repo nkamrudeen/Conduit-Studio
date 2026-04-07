@@ -274,18 +274,29 @@ def render_node(
     return code, meta["packages"]
 
 
-def generate_snippets(dag: PipelineDAG) -> tuple[list[PipelineNode], list[str], list[str]]:
+def generate_snippets(
+    dag: PipelineDAG,
+    include_meta: bool = False,
+) -> tuple[list[PipelineNode], list[str], list[str]] | tuple[list[PipelineNode], list[str], list[str], list[dict]]:
     """Return (ordered_nodes, snippets, packages) without assembling.
+
+    When *include_meta* is True, a fourth element ``step_meta`` is returned —
+    a list of per-step dicts with input_var/input_type/output_var/output_type
+    used by the Kubeflow assembler to wire KFP v2 artifact I/O correctly.
 
     Used by the executor to inject per-node status markers at run time.
     """
     if not dag.nodes:
+        if include_meta:
+            return [], [], [], []
         return [], [], []
 
     ordered = topological_sort(dag)
     snippets: list[str] = []
     all_packages: list[str] = []
     source_vars: dict[str, dict[str, str]] = {}
+    source_types: dict[str, str] = {}  # node_id → output_type prefix
+    step_meta: list[dict] = []
     pred_edges: dict[str, list] = {}
     for edge in dag.edges:
         pred_edges.setdefault(edge.target, []).append(edge)
@@ -300,19 +311,47 @@ def generate_snippets(dag: PipelineDAG) -> tuple[list[PipelineNode], list[str], 
             )
             if src_var:
                 inputs_by_handle[edge.targetHandle] = src_var
+
+        # Collect KFP step metadata before rendering
+        primary_input_var = next(iter(inputs_by_handle.values()), "") if inputs_by_handle else ""
+        primary_input_type = "df"
+        for edge in pred_edges.get(node.id, []):
+            primary_input_type = source_types.get(edge.source, "df")
+            break
+
         snippet, pkgs = render_node(node, inputs_by_handle)
         snippets.append(snippet)
         all_packages.extend(pkgs)
+
+        prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
         if node.definitionId in _NODE_HANDLE_OUTPUTS:
             source_vars[node.id] = {
                 handle: tpl.format(short=short)
                 for handle, tpl in _NODE_HANDLE_OUTPUTS[node.definitionId].items()
             }
+            # Use the first handle's variable as the canonical output for KFP
+            first_var = next(iter(source_vars[node.id].values()))
+            step_meta.append({
+                "input_var": primary_input_var,
+                "input_type": primary_input_type,
+                "output_var": first_var,
+                "output_type": prefix,
+            })
         else:
-            prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
-            source_vars[node.id] = {node.definitionId: f"{prefix}_{short}"}
+            output_var = f"{prefix}_{short}"
+            source_vars[node.id] = {node.definitionId: output_var}
+            step_meta.append({
+                "input_var": primary_input_var,
+                "input_type": primary_input_type,
+                "output_var": output_var,
+                "output_type": prefix,
+            })
+        source_types[node.id] = prefix
 
-    return ordered, snippets, list(dict.fromkeys(all_packages))
+    packages_deduped = list(dict.fromkeys(all_packages))
+    if include_meta:
+        return ordered, snippets, packages_deduped, step_meta
+    return ordered, snippets, packages_deduped
 
 
 def save_format(
@@ -323,6 +362,7 @@ def save_format(
     packages: list[str],
     project_folder: str,
     use_package_layout: bool = False,
+    step_meta: list[dict] | None = None,
 ) -> list[str]:
     """Write a single output format to *project_folder*.
 
@@ -362,7 +402,7 @@ def save_format(
             written.append(str(req_path))
 
         case "kubeflow":
-            kfp_code, kfp_name = kubeflow_gen.assemble(dag, snippets, packages)
+            kfp_code, kfp_name = kubeflow_gen.assemble(dag, snippets, packages, step_meta=step_meta)
             kfp_path = root / kfp_name
             kfp_path.write_text(kfp_code, encoding="utf-8")
             written.append(str(kfp_path))
@@ -397,6 +437,8 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
 
     # source_vars[node_id][handle_id] = variable_name produced by that output handle
     source_vars: dict[str, dict[str, str]] = {}
+    source_types: dict[str, str] = {}  # node_id → output_type prefix
+    step_meta: list[dict] = []
 
     # Build edge index: target_node_id → list of incoming edges
     pred_edges: dict[str, list] = {}
@@ -417,20 +459,41 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
             if src_var:
                 inputs_by_handle[edge.targetHandle] = src_var
 
+        # Collect KFP step metadata
+        primary_input_var = next(iter(inputs_by_handle.values()), "") if inputs_by_handle else ""
+        primary_input_type = "df"
+        for edge in pred_edges.get(node.id, []):
+            primary_input_type = source_types.get(edge.source, "df")
+            break
+
         snippet, pkgs = render_node(node, inputs_by_handle)
         snippets.append(snippet)
         all_packages.extend(pkgs)
 
         # Record output variables for this node
+        prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
         if node.definitionId in _NODE_HANDLE_OUTPUTS:
-            # Multi-output node: register each handle's variable
             source_vars[node.id] = {
                 handle: tpl.format(short=short)
                 for handle, tpl in _NODE_HANDLE_OUTPUTS[node.definitionId].items()
             }
+            first_var = next(iter(source_vars[node.id].values()))
+            step_meta.append({
+                "input_var": primary_input_var,
+                "input_type": primary_input_type,
+                "output_var": first_var,
+                "output_type": prefix,
+            })
         else:
-            prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
-            source_vars[node.id] = {node.definitionId: f"{prefix}_{short}"}
+            output_var = f"{prefix}_{short}"
+            source_vars[node.id] = {node.definitionId: output_var}
+            step_meta.append({
+                "input_var": primary_input_var,
+                "input_type": primary_input_type,
+                "output_var": output_var,
+                "output_type": prefix,
+            })
+        source_types[node.id] = prefix
 
         if node.definitionId not in _NODE_META:
             warnings.append(
@@ -445,7 +508,7 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
         case "notebook":
             code, filename = notebook_gen.assemble(dag, snippets, unique_packages)
         case "kubeflow":
-            code, filename = kubeflow_gen.assemble(dag, snippets, unique_packages)
+            code, filename = kubeflow_gen.assemble(dag, snippets, unique_packages, step_meta=step_meta)
         case "docker":
             code, filename = docker_gen.assemble(dag, snippets, unique_packages)
         case _:

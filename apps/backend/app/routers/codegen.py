@@ -40,9 +40,9 @@ async def generate_code(request: CodeGenRequest) -> CodeGenResponse:
         result = generate(request.dag, request.format)
 
         if request.project_folder:
-            # Re-run snippet generation (cheap) to get ordered nodes + snippets.
-            ordered, snippets, packages = await asyncio.to_thread(
-                generate_snippets, request.dag
+            # Re-run snippet generation to get ordered nodes + snippets + KFP metadata.
+            ordered, snippets, packages, step_meta = await asyncio.to_thread(
+                generate_snippets, request.dag, True
             )
             saved = await asyncio.to_thread(
                 save_format,
@@ -53,6 +53,7 @@ async def generate_code(request: CodeGenRequest) -> CodeGenResponse:
                 packages,
                 request.project_folder,
                 request.use_package_layout,
+                step_meta,
             )
             result.saved_files = saved
 

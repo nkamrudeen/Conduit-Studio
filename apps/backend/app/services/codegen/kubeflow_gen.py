@@ -9,47 +9,140 @@ HEADER = '''\
 #  Run: python {filename} && kfp run create --experiment-name "{name}" -f pipeline.yaml
 # ============================================================
 from kfp import dsl
+from kfp.dsl import Input, Output, Dataset
 from kfp.compiler import Compiler
 
 '''
 
-PIPELINE_HEADER = '''
-
+PIPELINE_HEADER = '''\
 @dsl.pipeline(name="{name}", description="AI-IDE generated pipeline")
 def pipeline():
 '''
 
-FOOTER = '''
+FOOTER = '''\
+
 if __name__ == "__main__":
     Compiler().compile(pipeline, "pipeline.yaml")
     print("Compiled to pipeline.yaml")
 '''
 
+# Serialisation helpers injected at the end of each component body (4-space indent).
+# {var} is replaced with the output variable name.
+_SER: dict[str, str] = {
+    "df":    "    {var}.to_parquet(output_artifact.path, index=False)\n",
+    "model": "    import joblib as _jbl; _jbl.dump({var}, output_artifact.path)\n",
+}
+_SER_DEFAULT = (
+    "    import pickle as _pkl\n"
+    "    with open(output_artifact.path, 'wb') as _f:\n"
+    "        _pkl.dump({var}, _f)\n"
+)
 
-def assemble(dag: PipelineDAG, snippets: list[str], packages: list[str]) -> tuple[str, str]:
+# Deserialisation helpers injected at the top of a component body.
+# {var} is replaced with the input variable name expected by the snippet.
+_DESER: dict[str, str] = {
+    "df":    "    import pandas as _pd; {var} = _pd.read_parquet(input_artifact.path)\n",
+    "model": "    import joblib as _jbl; {var} = _jbl.load(input_artifact.path)\n",
+}
+_DESER_DEFAULT = (
+    "    import pickle as _pkl\n"
+    "    with open(input_artifact.path, 'rb') as _f:\n"
+    "        {var} = _pkl.load(_f)\n"
+)
+
+
+def _make_component(
+    name: str,
+    snippet: str,
+    packages: list[str],
+    input_var: str,
+    input_type: str,
+    output_var: str,
+    output_type: str,
+) -> str:
+    """Return a @dsl.component function string with KFP v2 artifact I/O."""
+    extra: list[str] = []
+    if "df" in (input_type, output_type) and "pyarrow" not in packages:
+        extra.append("pyarrow")
+    if "model" in (input_type, output_type) and "joblib" not in packages:
+        extra.append("joblib")
+    all_packages = packages + extra
+
+    params: list[str] = []
+    if input_var:
+        params.append("input_artifact: Input[Dataset]")
+    params.append("output_artifact: Output[Dataset]")
+    sig = ", ".join(params)
+
+    deser = ""
+    if input_var:
+        tpl = _DESER.get(input_type, _DESER_DEFAULT)
+        deser = tpl.format(var=input_var)
+
+    indented_snippet = "\n".join(f"    {line}" for line in snippet.splitlines())
+
+    ser = ""
+    if output_var:
+        tpl = _SER.get(output_type, _SER_DEFAULT)
+        ser = tpl.format(var=output_var)
+
+    body = deser + indented_snippet + "\n" + ser
+
+    return (
+        f"@dsl.component(packages_to_install={all_packages!r})\n"
+        f"def {name}({sig}):\n"
+        f"{body}\n"
+    )
+
+
+def assemble(
+    dag: PipelineDAG,
+    snippets: list[str],
+    packages: list[str],
+    step_meta: list[dict] | None = None,
+) -> tuple[str, str]:
     filename = dag.name.lower().replace(" ", "_") + "_kubeflow.py"
     header = HEADER.format(name=dag.name, filename=filename)
 
-    # Wrap each snippet in a kfp component
+    use_artifacts = step_meta is not None and len(step_meta) == len(snippets)
+
     component_names: list[str] = []
     components: list[str] = []
+
     for i, snippet in enumerate(snippets):
-        indented = "\n".join(f"    {line}" for line in snippet.splitlines())
         name = f"step_{i + 1}"
         component_names.append(name)
-        components.append(
-            f"@dsl.component(packages_to_install={packages!r})\n"
-            f"def {name}():\n"
-            f"{indented}\n"
-        )
 
-    # Build the pipeline function body — call each component and chain sequentially
+        if use_artifacts:
+            meta = step_meta[i]
+            components.append(_make_component(
+                name=name,
+                snippet=snippet,
+                packages=packages,
+                input_var=meta.get("input_var", ""),
+                input_type=meta.get("input_type", "df"),
+                output_var=meta.get("output_var", ""),
+                output_type=meta.get("output_type", "df"),
+            ))
+        else:
+            # Legacy fallback: no artifact wiring (variables may not be in scope)
+            indented = "\n".join(f"    {line}" for line in snippet.splitlines())
+            components.append(
+                f"@dsl.component(packages_to_install={packages!r})\n"
+                f"def {name}():\n"
+                f"{indented}\n"
+            )
+
+    # Build pipeline function — wire artifact outputs to next step's input
     pipeline_lines: list[str] = []
     for i, name in enumerate(component_names):
-        if i == 0:
-            pipeline_lines.append(f"    task_{i + 1} = {name}()")
+        if use_artifacts and i > 0:
+            pipeline_lines.append(
+                f"    task_{i + 1} = {name}("
+                f"input_artifact=task_{i}.outputs['output_artifact'])"
+            )
         else:
-            pipeline_lines.append(f"    task_{i + 1} = {name}().after(task_{i})")
+            pipeline_lines.append(f"    task_{i + 1} = {name}()")
 
     pipeline_body = PIPELINE_HEADER.format(name=dag.name)
     pipeline_body += "\n".join(pipeline_lines) + "\n"

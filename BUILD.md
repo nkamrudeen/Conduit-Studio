@@ -29,8 +29,14 @@ pnpm exec vite preview --port 4000
 
 ```bash
 cd apps/backend
+uv sync                        # core dependencies
+uv sync --extra azure          # adds azure-storage-blob, azure-ai-ml, azure-identity
 uv run uvicorn app.main:app --reload --port 8000
 ```
+
+> **Azure ML / Cloud Deployment** requires the `azure` extra:
+> `azure-ai-ml` and `azure-identity` are included in `uv sync --extra azure`.
+> Without these packages the Cloud Deployment panel will raise an import error at startup.
 
 ### Docker image
 
@@ -74,7 +80,7 @@ pyinstaller conduit-backend.spec --clean
 - `app.routers.vault` — Secrets Vault (requires `cryptography`)
 - `app.routers.history` — Pipeline snapshot store (requires `sqlite3`)
 - `app.routers.debug` — RAG retrieval debugger
-- `app.routers.cloud_deploy` — Azure ML deployment (requires `azure-ai-ml`)
+- `app.routers.cloud_deploy` — Azure ML deployment (requires `azure-ai-ml`, `azure-identity`)
 - `app.routers.playground` — Prompt Playground streaming
 - `app.routers.experiments` — Experiment Leaderboard
 

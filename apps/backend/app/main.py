@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import pipeline, codegen, connectors, mlflow, kubeflow, huggingface, agent, files, project, integrations, playground, analyze
+from app.routers import pipeline, codegen, connectors, mlflow, kubeflow, huggingface, agent, files, project, integrations, playground, analyze, cloud_deploy, debug, vault, history
 
 app = FastAPI(
     title="ConduitCraft AI Backend",
@@ -38,6 +38,10 @@ app.include_router(project.router, prefix="/project", tags=["project"])
 app.include_router(integrations.router, prefix="/integrations", tags=["integrations"])
 app.include_router(playground.router, prefix="/playground", tags=["playground"])
 app.include_router(analyze.router, prefix="/analyze", tags=["analyze"])
+app.include_router(cloud_deploy.router, prefix="/cloud-deploy", tags=["cloud-deploy"])
+app.include_router(debug.router, prefix="/debug", tags=["debug"])
+app.include_router(vault.router, prefix="/vault", tags=["vault"])
+app.include_router(history.router, prefix="/history", tags=["history"])
 
 
 @app.get("/health")

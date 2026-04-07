@@ -1,0 +1,33 @@
+# ── A/B Split ────────────────────────────────────────────────────────────────
+import concurrent.futures as _cf_{{ node_id }}
+
+_df_ab_input_{{ node_id }} = {{ input_var }}
+_ratio_{{ node_id }}    = {{ config.get('split_ratio', 0.5) }}
+_strategy_{{ node_id }} = "{{ config.get('strategy', 'random') }}"
+_seed_{{ node_id }}     = {{ config.get('random_seed', 42) }}
+
+if _strategy_{{ node_id }} == "stratified":
+    from sklearn.model_selection import train_test_split as _tts_{{ node_id }}
+    _stratify_col_{{ node_id }} = "{{ config.get('stratify_col', '') }}"
+    _strat_series_{{ node_id }} = (
+        _df_ab_input_{{ node_id }}[_stratify_col_{{ node_id }}]
+        if _stratify_col_{{ node_id }} and _stratify_col_{{ node_id }} in _df_ab_input_{{ node_id }}.columns
+        else None
+    )
+    branch_a_{{ node_id }}, branch_b_{{ node_id }} = _tts_{{ node_id }}(
+        _df_ab_input_{{ node_id }},
+        train_size=_ratio_{{ node_id }},
+        random_state=_seed_{{ node_id }},
+        stratify=_strat_series_{{ node_id }},
+    )
+elif _strategy_{{ node_id }} == "first_n":
+    _n_{{ node_id }} = int(len(_df_ab_input_{{ node_id }}) * _ratio_{{ node_id }})
+    branch_a_{{ node_id }} = _df_ab_input_{{ node_id }}.iloc[:_n_{{ node_id }}].reset_index(drop=True)
+    branch_b_{{ node_id }} = _df_ab_input_{{ node_id }}.iloc[_n_{{ node_id }}:].reset_index(drop=True)
+else:  # random
+    branch_a_{{ node_id }} = _df_ab_input_{{ node_id }}.sample(
+        frac=_ratio_{{ node_id }}, random_state=_seed_{{ node_id }}
+    ).reset_index(drop=True)
+    branch_b_{{ node_id }} = _df_ab_input_{{ node_id }}.drop(branch_a_{{ node_id }}.index).reset_index(drop=True)
+
+print(f"A/B Split — Branch A: {len(branch_a_{{ node_id }})} rows, Branch B: {len(branch_b_{{ node_id }})} rows")

@@ -20,15 +20,25 @@
 ## Features
 
 - **Visual pipeline builder** — drag nodes onto a canvas, connect them with typed edges
-- **Dual pipeline modes** — ML Pipeline (scikit-learn, Keras, PyTorch, XGBoost) and LLM Pipeline (LangChain, OpenAI, Anthropic Claude, Ollama, Pinecone)
+- **Dual pipeline modes** — ML Pipeline (scikit-learn, Keras, PyTorch, XGBoost) and LLM Pipeline (LangChain, LangGraph, OpenAI, Anthropic Claude, Ollama, Pinecone)
 - **Code generation** — one click produces Python scripts, Jupyter notebooks, Kubeflow DSL, or Dockerfiles; save directly to your project folder
 - **Package layout** — Python output can be structured as an installable package (`src/<slug>/pipeline.py` + `pyproject.toml`)
 - **Inline data preview** — after a run, each node shows its output on the canvas: DataFrame shape + mini table, model class name, metrics, text
+- **Prompt Playground** *(development branch — not yet in main)* — LLM/chain nodes have a live test tab in the Inspector: type a query, stream the response, save + version prompt templates
+- **A/B Split nodes** *(development branch — not yet in main)* — fork ML or LLM pipelines into two parallel branches with configurable split strategies; results appear side-by-side in the Experiment Leaderboard
+- **Retrieval Debugger** *(development branch — not yet in main)* — RAG chain nodes have a Debug tab showing retrieved chunks with similarity scores, the assembled prompt, and the model response
+- **Pipeline History & Diff** *(development branch — not yet in main)* — auto-saves a snapshot every 30 seconds; compare any two snapshots with a visual diff (added/removed/changed nodes + config diffs) and restore any version
+- **Secrets Vault** *(development branch — not yet in main)* — API keys and tokens encrypted at rest (AES-256 Fernet) in your project folder; referenced as `os.environ["KEY"]` in generated code; all Integrations panel credentials stored automatically
+- **Cloud Deployment (Azure ML)** *(development branch — not yet in main)* — submit pipeline jobs and deploy real-time inference endpoints from the toolbar; AWS SageMaker and Google Vertex AI coming soon
+- **Experiment Leaderboard** *(development branch — not yet in main)* — sortable metrics table of all past runs; compare any two runs with a config diff view; MLflow adapter + local SQLite fallback
+- **Model Card Generator** *(development branch — not yet in main)* — one-click HuggingFace-format `MODEL_CARD.md` from any Deploy node, pre-filled with architecture, metrics, and requirements
+- **Cost Estimator** *(development branch — not yet in main)* — estimates LLM token cost for any pipeline containing LLM nodes; shown as a banner above the Run button
+- **Package Conflict Detector** *(development branch — not yet in main)* — Analyze button resolves the full pip dependency set and marks conflicting nodes with a red badge and tooltip
 - **Port type validation** — incompatible connections are blocked at draw time; the Validate button scans the whole pipeline
 - **Data connectors** — local files, AWS S3, Azure Blob, GCS, PostgreSQL, HuggingFace Datasets (with streaming preview)
 - **File upload** — upload CSV/Parquet files through the UI; files are stored server-side and bundled in Docker builds
 - **File browser** — browse and manage files in the current project folder
-- **MLOps integrations** — MLflow, Kubeflow Pipelines (OAuth2 + token auth), HuggingFace Hub; all with Test Connection
+- **MLOps integrations** — MLflow, Kubeflow Pipelines (OAuth2 + token auth), HuggingFace Hub; all with Test Connection; credentials stored in Secrets Vault
 - **Plugin system** — community plugins add new node types via an iframe sandbox and `postMessage` API
 - **Pipeline execution** — run locally or inside Docker with real-time WebSocket log streaming and per-node status indicators
 - **Sample pipelines** — 10 pre-built ML and LLM templates to get started instantly
@@ -91,7 +101,7 @@ uv run uvicorn app.main:app --reload --port 8000
 
 Open **http://localhost:3000** in your browser.
 
-> The backend is required for **code generation**, **pipeline execution**, **file uploads**, and **data previews**. The visual canvas and sample pipelines work without it.
+> The backend is required for **code generation**, **pipeline execution**, **file uploads**, **data previews**, **secrets vault**, **cloud deployment**, and **pipeline history**. The visual canvas and sample pipelines work without it.
 
 ---
 
@@ -104,17 +114,27 @@ conduitcraft-ai/
 │   ├── desktop/      # Electron wrapper + PyInstaller bundled backend
 │   └── backend/      # FastAPI execution engine + code generator (port 8000)
 │       ├── app/
-│       │   ├── routers/          # pipeline, codegen, connectors, files, integrations, …
+│       │   ├── routers/          # pipeline, codegen, connectors, files,
+│       │   │                     # integrations, vault, history, debug,
+│       │   │                     # cloud_deploy, playground, experiments, …
 │       │   ├── services/
-│       │   │   ├── codegen/      # Python / Notebook / Kubeflow / Docker / Package gen
+│       │   │   ├── codegen/      # Python / Notebook / Kubeflow / Docker /
+│       │   │   │                 # Package / Model Card gen
 │       │   │   ├── connectors/   # local, S3, Azure, GCS, Postgres, HuggingFace
-│       │   │   └── integrations/ # MLflow, Kubeflow, HuggingFace clients
+│       │   │   ├── integrations/ # MLflow, Kubeflow, HuggingFace clients
+│       │   │   ├── vault.py      # AES-256 Fernet secrets store
+│       │   │   ├── pipeline_history.py  # SQLite snapshot store
+│       │   │   ├── retrieval_debug.py   # RAG trace engine
+│       │   │   ├── azure_ml.py          # Azure ML SDK client
+│       │   │   ├── playground.py        # LLM prompt streaming + versioning
+│       │   │   ├── cost_estimator.py    # Token count + pricing lookup
+│       │   │   └── dep_checker.py       # Pip dependency conflict resolver
 │       │   └── models/
 │       ├── conduit-backend.spec  # PyInstaller bundle spec
 │       └── startup.py            # Uvicorn entry point (with startup logging)
 ├── packages/
 │   ├── canvas-engine/    # React Flow canvas + Zustand store + port validation
-│   ├── node-registry/    # All built-in node definitions (ML + LLM)
+│   ├── node-registry/    # All built-in node definitions (ML + LLM + Split nodes)
 │   ├── plugin-sdk/       # SDK for building community plugins
 │   ├── types/            # Shared TypeScript interfaces (PipelineNode, NodeResult, …)
 │   └── ui/               # Shared shadcn/ui component library
@@ -127,14 +147,14 @@ conduitcraft-ai/
 
 ### ML Pipeline
 ```
-Data Ingestion → Transform → Train → Evaluate → Deploy → Monitor
+Data Ingestion → Transform → [A/B Split →] Train → Evaluate → Deploy → Monitor
 ```
 Frameworks: scikit-learn · XGBoost · Keras/TensorFlow · PyTorch  
-MLOps: MLflow experiment tracking · Kubeflow Pipelines · HuggingFace Hub
+MLOps: MLflow experiment tracking · Kubeflow Pipelines · HuggingFace Hub · Azure ML
 
 ### LLM Pipeline
 ```
-Ingest → Chunk → Embed → VectorStore → LLM → Chain/Agent → Deploy → Monitor
+Ingest → Chunk → Embed → VectorStore → LLM → Chain/Agent → [A/B Split →] Deploy → Monitor
 ```
 LLMs: OpenAI · Anthropic Claude · Ollama · vLLM  
 Chains: LangChain · LangGraph · LlamaIndex  
@@ -159,7 +179,17 @@ Use **Save to Project Folder** to write the active format directly to disk along
 
 ---
 
-## Inline Data Preview (Phase 8)
+## Secrets Vault *(development branch — not yet in main)*
+
+All API keys and tokens are stored **encrypted** (AES-256 Fernet) in `{project_folder}/.secrets.json`. The encryption key lives in `{project_folder}/.vault.key` — both files are gitignored automatically.
+
+- Manage secrets via **Settings → Secrets** (⚙ icon)
+- All password/token fields in the Integrations panel store values in the vault automatically
+- Generated code renders secrets as `os.environ["KEY"]` with a companion `.env.example`
+
+---
+
+## Inline Data Preview
 
 After a pipeline run, each node automatically shows its output directly on the canvas card — no Jupyter context-switch needed:
 
@@ -169,6 +199,20 @@ After a pipeline run, each node automatically shows its output directly on the c
 - **Text / Number** → truncated inline display
 
 The full output (5 rows × 6 columns, dtypes, duration) is also shown in the **Node Inspector** panel when the node is selected.
+
+---
+
+## Cloud Deployment *(development branch — not yet in main)*
+
+Click the **Cloud** icon (upload-cloud) in the top-right toolbar to open the Cloud Deployment panel:
+
+| Provider | Status | Features |
+|---|---|---|
+| **Azure ML** | ✅ Available | Test connection, submit pipeline jobs, deploy real-time endpoints, poll job status |
+| **AWS SageMaker** | 🔜 Coming soon | — |
+| **Google Vertex AI** | 🔜 Coming soon | — |
+
+Azure credentials (Subscription ID, Client ID/Secret, Tenant ID) are stored in the Secrets Vault.
 
 ---
 
@@ -196,7 +240,7 @@ See [BUILD.md](BUILD.md) for full instructions.
 |---|---|
 | Frontend | React 18, TypeScript, React Flow v12, Vite, Tailwind CSS, shadcn/ui |
 | State | Zustand + Immer |
-| Backend | Python 3.11, FastAPI, uvicorn, Jinja2, datasets, huggingface-hub |
+| Backend | Python 3.11, FastAPI, uvicorn, Jinja2, cryptography, datasets, huggingface-hub |
 | Desktop | Electron 33, PyInstaller (onedir bundle) |
 | Monorepo | Turborepo + pnpm workspaces |
 
@@ -204,7 +248,7 @@ See [BUILD.md](BUILD.md) for full instructions.
 
 ## Integrations
 
-All integrations are configured in the **Integrations panel** (branching icon, top-right). Each has a **Test Connection** button.
+All integrations are configured in the **Integrations panel** (branching icon, top-right). Each has a **Test Connection** button. Credentials are stored encrypted in the Secrets Vault (development branch) or in `localStorage` (current main branch).
 
 | Service | Auth | Notes |
 |---|---|---|
@@ -214,8 +258,7 @@ All integrations are configured in the **Integrations panel** (branching icon, t
 | **OpenAI** | API key | Pre-fills base URL |
 | **Anthropic** | API key | |
 | **AWS S3** | Access key + secret | Pre-fills `us-east-1` |
-
-Credentials are stored in `localStorage`. For production, inject them as environment variables.
+| **Azure ML** | Client ID + Secret + Tenant ID | Configured via Cloud Deployment panel |
 
 ---
 

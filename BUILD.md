@@ -70,6 +70,14 @@ pyinstaller conduit-backend.spec --clean
 
 **Adding new routers/services:** If you add a new Python module that FastAPI loads dynamically (via `include_router` or `importlib`), add it to `hidden_imports` in `conduit-backend.spec` and rebuild.
 
+**New routers in the bundle** *(development branch — add these to `hidden_imports` once merged to main)*: The following modules must be present when building the PyInstaller bundle:
+- `app.routers.vault` — Secrets Vault (requires `cryptography`)
+- `app.routers.history` — Pipeline snapshot store (requires `sqlite3`)
+- `app.routers.debug` — RAG retrieval debugger
+- `app.routers.cloud_deploy` — Azure ML deployment (requires `azure-ai-ml`)
+- `app.routers.playground` — Prompt Playground streaming
+- `app.routers.experiments` — Experiment Leaderboard
+
 ---
 
 ## 3. Desktop App (Electron)
@@ -191,9 +199,17 @@ ANTHROPIC_API_KEY=
 
 # HuggingFace
 HF_TOKEN=
+
+# Azure ML (for Cloud Deployment panel — development branch only)
+AZURE_SUBSCRIPTION_ID=
+AZURE_RESOURCE_GROUP=
+AZURE_WORKSPACE_NAME=
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+AZURE_TENANT_ID=
 ```
 
-Credentials configured in the **Integrations panel** (UI) are stored in `localStorage` and injected as environment variables at pipeline run time — they do not need to be in `.env` unless you are running the backend directly without the UI.
+In the current main branch, credentials configured in the **Integrations panel** are stored in `localStorage`. Once the development branch is merged, they will be encrypted and stored in the **Secrets Vault** (`{project_folder}/.secrets.json`) using AES-256 Fernet encryption — the key lives in `{project_folder}/.vault.key` (auto-gitignored).
 
 ---
 

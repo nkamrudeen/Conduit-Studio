@@ -9,6 +9,7 @@ import { mlEvaluateNodes } from './ml/evaluate'
 import { mlDeployNodes } from './ml/deploy'
 import { mlMonitorNodes } from './ml/monitor'
 import { mlMlflowNodes } from './ml/mlflow'
+import { mlSplitNodes } from './ml/split'
 import { llmIngestNodes } from './llm/ingest'
 import { llmChunkNodes } from './llm/chunk'
 import { llmEmbedNodes } from './llm/embed'
@@ -17,6 +18,7 @@ import { llmModelNodes } from './llm/llm'
 import { llmChainNodes } from './llm/chain'
 import { llmDeployNodes } from './llm/deploy'
 import { llmFinetuneNodes } from './llm/finetune'
+import { llmSplitNodes } from './llm/split'
 
 nodeRegistry.registerAll([
   ...mlIngestNodes,
@@ -26,6 +28,7 @@ nodeRegistry.registerAll([
   ...mlDeployNodes,
   ...mlMonitorNodes,
   ...mlMlflowNodes,
+  ...mlSplitNodes,
   ...llmIngestNodes,
   ...llmChunkNodes,
   ...llmEmbedNodes,
@@ -34,4 +37,5 @@ nodeRegistry.registerAll([
   ...llmChainNodes,
   ...llmDeployNodes,
   ...llmFinetuneNodes,
+  ...llmSplitNodes,
 ])

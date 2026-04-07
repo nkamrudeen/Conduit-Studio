@@ -13,6 +13,7 @@ import { LogPanel } from './LogPanel'
 import { AgentPanel } from '../agent/AgentPanel'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@ai-ide/ui'
 import { Bot, CheckCircle2, XCircle, X } from 'lucide-react'
+import { PipelineDiffView } from './PipelineDiffView'
 import { getApiBase } from '../../lib/api'
 import { getNodeIntegrationDefaults, getIntegrationEnvVars } from '../../lib/integrations'
 
@@ -29,6 +30,7 @@ export function CanvasPage() {
   const [validateResult, setValidateResult] = useState<PortTypeError[] | null>(null)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const [showKubeflowDialog, setShowKubeflowDialog] = useState(false)
   const [kubeflowHost, setKubeflowHost] = useState('http://localhost:8080')
@@ -172,9 +174,13 @@ export function CanvasPage() {
           onStop={handleStop}
           onValidate={handleValidate}
           onAnalyze={handleAnalyze}
+          onHistory={() => setShowHistory(true)}
           isRunning={isRunning}
           pipelineType={pipelineType}
         />
+
+        {/* Pipeline history/diff modal */}
+        {showHistory && <PipelineDiffView onClose={() => setShowHistory(false)} />}
 
         {/* Run error banner */}
         {runError && (

@@ -68,7 +68,19 @@
       "Bash(xargs grep:*)",
       "Bash(git push:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pnpm --filter @ai-ide/web tsc --noEmit)",
+      "Bash(pnpm --filter @ai-ide/types build)",
+      "Bash(ffmpeg -i \"c:/projects/conduitcraft.github.io/demo_orig.mp4\" -vcodec libx264 -crf 28 -preset fast -vf \"scale=1280:-2\" -acodec aac -b:a 128k \"c:/projects/conduitcraft.github.io/demo.mp4\" -y)",
+      "Bash(sed -i 's/owner: conduitcraft-ai/owner: nkamrudeen/' apps/desktop/electron-builder.yml)",
+      "Bash(sed -i 's/repo: conduitcraft-ai/repo: ConduitCraft-AI/' apps/desktop/electron-builder.yml)",
+      "Bash(python -c \"from PIL import Image; img = Image.open\\('c:/projects/ai-ide/apps/desktop/assets/icon.png'\\); print\\(img.size\\)\")",
+      "Bash(identify c:/projects/ai-ide/apps/desktop/assets/icon.png)",
+      "Bash(python -c \"import struct,zlib,open as o\")",
+      "Bash(python -c ':*)"
+    ],
+    "additionalDirectories": [
+      "c:\\projects\\conduitcraft.github.io"
     ]
   }
 }

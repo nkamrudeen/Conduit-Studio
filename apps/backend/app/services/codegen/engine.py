@@ -70,6 +70,9 @@ _NODE_META: dict[str, dict] = {
     "ml.deploy.fastapi": {"template": "ml/deploy_fastapi.py.j2", "packages": ["fastapi", "uvicorn", "joblib"]},
     "ml.deploy.huggingface_hub": {"template": "ml/deploy_huggingface_hub.py.j2", "packages": ["huggingface_hub"]},
     # ML Monitor
+    # ML A/B Split
+    "ml.split.ab": {"template": "ml/split_ab.py.j2", "packages": ["pandas", "scikit-learn"]},
+    # ML Monitor
     "ml.monitor.evidently_drift": {"template": "ml/monitor_evidently_drift.py.j2", "packages": ["evidently>=0.4.0,<0.5.0"]},
     "ml.monitor.model_performance": {"template": "ml/monitor_model_performance.py.j2", "packages": ["scikit-learn", "evidently>=0.4.0,<0.5.0"]},
     # ML MLflow Experiment Tracking
@@ -94,6 +97,9 @@ _NODE_META: dict[str, dict] = {
     "llm.model.anthropic": {"template": "llm/model_anthropic.py.j2", "packages": ["langchain-anthropic"]},
     "llm.model.ollama": {"template": "llm/model_ollama.py.j2", "packages": ["langchain-ollama"]},
     "llm.model.vllm": {"template": "llm/model_vllm.py.j2", "packages": ["langchain-openai"]},
+    # LLM A/B Split
+    "llm.split.ab": {"template": "llm/split_ab.py.j2", "packages": ["langchain-core"]},
+    # LLM Chain
     "llm.chain.rag": {"template": "llm/chain_rag.py.j2", "packages": ["langchain", "langchain-core"]},
     "llm.chain.react_agent": {"template": "llm/chain_react_agent.py.j2", "packages": ["langchain", "langgraph"]},
     "llm.chain.langgraph_workflow": {"template": "llm/chain_langgraph_workflow.py.j2", "packages": ["langgraph"]},
@@ -116,6 +122,14 @@ _NODE_HANDLE_OUTPUTS: dict[str, dict[str, str]] = {
     "ml.transform.train_test_split": {
         "df_train": "df_train_{short}",
         "df_test": "df_test_{short}",
+    },
+    "ml.split.ab": {
+        "branch_a": "branch_a_{short}",
+        "branch_b": "branch_b_{short}",
+    },
+    "llm.split.ab": {
+        "branch_a": "branch_a_{short}",
+        "branch_b": "branch_b_{short}",
     },
 }
 

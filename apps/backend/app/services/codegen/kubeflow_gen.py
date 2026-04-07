@@ -57,10 +57,20 @@ def _make_component(
     packages: list[str],
     input_var: str,
     input_type: str,
+    input_is_bundle: bool,
+    input_key: str,
     output_var: str,
     output_type: str,
+    is_multi_output: bool,
+    multi_output_vars: dict[str, str],
 ) -> str:
-    """Return a @dsl.component function string with KFP v2 artifact I/O."""
+    """Return a @dsl.component function string with KFP v2 artifact I/O.
+
+    Multi-output nodes (e.g. train_test_split) serialise all branch variables
+    into a single pickle bundle so the one KFP output_artifact carries both
+    outputs.  Downstream steps that receive from a multi-output node unpack
+    only the key they need.
+    """
     extra: list[str] = []
     if "df" in (input_type, output_type) and "pyarrow" not in packages:
         extra.append("pyarrow")
@@ -74,15 +84,34 @@ def _make_component(
     params.append("output_artifact: Output[Dataset]")
     sig = ", ".join(params)
 
+    # ── Deserialisation ───────────────────────────────────────────────────────
     deser = ""
     if input_var:
-        tpl = _DESER.get(input_type, _DESER_DEFAULT)
-        deser = tpl.format(var=input_var)
+        if input_is_bundle:
+            # Predecessor was a multi-output node — unpack the specific key
+            deser = (
+                f"    import pickle as _pkl\n"
+                f"    with open(input_artifact.path, 'rb') as _f:\n"
+                f"        _bundle = _pkl.load(_f)\n"
+                f"    {input_var} = _bundle[{input_key!r}]\n"
+            )
+        else:
+            tpl = _DESER.get(input_type, _DESER_DEFAULT)
+            deser = tpl.format(var=input_var)
 
     indented_snippet = "\n".join(f"    {line}" for line in snippet.splitlines())
 
+    # ── Serialisation ─────────────────────────────────────────────────────────
     ser = ""
-    if output_var:
+    if is_multi_output and multi_output_vars:
+        # Bundle all branch variables into a single pickle dict
+        entries = ", ".join(f"{k!r}: {v}" for k, v in multi_output_vars.items())
+        ser = (
+            f"    import pickle as _pkl\n"
+            f"    with open(output_artifact.path, 'wb') as _f:\n"
+            f"        _pkl.dump({{{entries}}}, _f)\n"
+        )
+    elif output_var:
         tpl = _SER.get(output_type, _SER_DEFAULT)
         ser = tpl.format(var=output_var)
 
@@ -121,8 +150,12 @@ def assemble(
                 packages=packages,
                 input_var=meta.get("input_var", ""),
                 input_type=meta.get("input_type", "df"),
+                input_is_bundle=meta.get("input_is_bundle", False),
+                input_key=meta.get("input_key", ""),
                 output_var=meta.get("output_var", ""),
                 output_type=meta.get("output_type", "df"),
+                is_multi_output=meta.get("is_multi_output", False),
+                multi_output_vars=meta.get("multi_output_vars", {}),
             ))
         else:
             # Legacy fallback: no artifact wiring (variables may not be in scope)

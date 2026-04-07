@@ -301,6 +301,8 @@ def generate_snippets(
     for edge in dag.edges:
         pred_edges.setdefault(edge.target, []).append(edge)
 
+    node_def_by_id: dict[str, str] = {n.id: n.definitionId for n in dag.nodes}
+
     for node in ordered:
         short = node.id.replace("-", "_")[:8]
         inputs_by_handle: dict[str, str] = {}
@@ -315,8 +317,14 @@ def generate_snippets(
         # Collect KFP step metadata before rendering
         primary_input_var = next(iter(inputs_by_handle.values()), "") if inputs_by_handle else ""
         primary_input_type = "df"
+        input_is_bundle = False
+        input_key = ""
         for edge in pred_edges.get(node.id, []):
             primary_input_type = source_types.get(edge.source, "df")
+            pred_def = node_def_by_id.get(edge.source, "")
+            if pred_def in _NODE_HANDLE_OUTPUTS:
+                input_is_bundle = True
+                input_key = edge.sourceHandle
             break
 
         snippet, pkgs = render_node(node, inputs_by_handle)
@@ -324,18 +332,23 @@ def generate_snippets(
         all_packages.extend(pkgs)
 
         prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
-        if node.definitionId in _NODE_HANDLE_OUTPUTS:
-            source_vars[node.id] = {
+        is_multi_output = node.definitionId in _NODE_HANDLE_OUTPUTS
+        if is_multi_output:
+            multi_output_vars = {
                 handle: tpl.format(short=short)
                 for handle, tpl in _NODE_HANDLE_OUTPUTS[node.definitionId].items()
             }
-            # Use the first handle's variable as the canonical output for KFP
-            first_var = next(iter(source_vars[node.id].values()))
+            source_vars[node.id] = multi_output_vars
+            first_var = next(iter(multi_output_vars.values()))
             step_meta.append({
                 "input_var": primary_input_var,
                 "input_type": primary_input_type,
+                "input_is_bundle": input_is_bundle,
+                "input_key": input_key,
                 "output_var": first_var,
                 "output_type": prefix,
+                "is_multi_output": True,
+                "multi_output_vars": multi_output_vars,
             })
         else:
             output_var = f"{prefix}_{short}"
@@ -343,8 +356,12 @@ def generate_snippets(
             step_meta.append({
                 "input_var": primary_input_var,
                 "input_type": primary_input_type,
+                "input_is_bundle": input_is_bundle,
+                "input_key": input_key,
                 "output_var": output_var,
                 "output_type": prefix,
+                "is_multi_output": False,
+                "multi_output_vars": {},
             })
         source_types[node.id] = prefix
 
@@ -445,6 +462,8 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
     for edge in dag.edges:
         pred_edges.setdefault(edge.target, []).append(edge)
 
+    node_def_by_id: dict[str, str] = {n.id: n.definitionId for n in dag.nodes}
+
     for node in ordered:
         short = node.id.replace("-", "_")[:8]
 
@@ -462,8 +481,14 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
         # Collect KFP step metadata
         primary_input_var = next(iter(inputs_by_handle.values()), "") if inputs_by_handle else ""
         primary_input_type = "df"
+        input_is_bundle = False
+        input_key = ""
         for edge in pred_edges.get(node.id, []):
             primary_input_type = source_types.get(edge.source, "df")
+            pred_def = node_def_by_id.get(edge.source, "")
+            if pred_def in _NODE_HANDLE_OUTPUTS:
+                input_is_bundle = True
+                input_key = edge.sourceHandle
             break
 
         snippet, pkgs = render_node(node, inputs_by_handle)
@@ -472,17 +497,23 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
 
         # Record output variables for this node
         prefix = _NODE_OUTPUT_PREFIX.get(node.definitionId, "df")
-        if node.definitionId in _NODE_HANDLE_OUTPUTS:
-            source_vars[node.id] = {
+        is_multi_output = node.definitionId in _NODE_HANDLE_OUTPUTS
+        if is_multi_output:
+            multi_output_vars = {
                 handle: tpl.format(short=short)
                 for handle, tpl in _NODE_HANDLE_OUTPUTS[node.definitionId].items()
             }
-            first_var = next(iter(source_vars[node.id].values()))
+            source_vars[node.id] = multi_output_vars
+            first_var = next(iter(multi_output_vars.values()))
             step_meta.append({
                 "input_var": primary_input_var,
                 "input_type": primary_input_type,
+                "input_is_bundle": input_is_bundle,
+                "input_key": input_key,
                 "output_var": first_var,
                 "output_type": prefix,
+                "is_multi_output": True,
+                "multi_output_vars": multi_output_vars,
             })
         else:
             output_var = f"{prefix}_{short}"
@@ -490,8 +521,12 @@ def generate(dag: PipelineDAG, fmt: CodeGenFormat) -> CodeGenResponse:
             step_meta.append({
                 "input_var": primary_input_var,
                 "input_type": primary_input_type,
+                "input_is_bundle": input_is_bundle,
+                "input_key": input_key,
                 "output_var": output_var,
                 "output_type": prefix,
+                "is_multi_output": False,
+                "multi_output_vars": {},
             })
         source_types[node.id] = prefix
 

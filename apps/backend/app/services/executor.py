@@ -913,8 +913,8 @@ async def execute_pipeline_kubeflow(
 
         # ── 1. Generate KFP DSL code ──────────────────────────────────────
         try:
-            ordered, snippets, packages = generate_snippets(dag_obj)
-            kfp_code, kfp_filename = kubeflow_gen.assemble(dag_obj, snippets, packages)
+            ordered, snippets, packages, step_meta = generate_snippets(dag_obj, include_meta=True)
+            kfp_code, kfp_filename = kubeflow_gen.assemble(dag_obj, snippets, packages, step_meta=step_meta)
         except Exception as exc:
             await queue.put({"type": "error", "text": f"Code generation failed: {exc}"})
             _run_status[run_id] = "error"

@@ -199,17 +199,20 @@ def _get_python_executable() -> str:
 
 
 def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = None) -> list[str]:
-    """Return the best available command to install *packages*.
+    """Return the best available command to install *packages* into the active venv.
 
-    Always uses ``sys.executable -m pip install`` so packages land in the same
-    Python environment that runs the generated pipeline scripts.
-
-    ``uv pip install`` is intentionally avoided here: when run from the backend
-    directory it picks up ``pyproject.toml`` and tries to modify the project
-    venv, which causes it to be killed by Windows (STATUS_CONTROL_C_EXIT /
-    0xC000013A) during large downloads such as torch.
+    uv venvs are created without pip by default, so ``sys.executable -m pip``
+    fails.  Use ``uv pip install --no-project`` instead — the ``--no-project``
+    flag prevents uv from reading pyproject.toml (which was causing it to be
+    killed on Windows during large downloads).  Falls back to bootstrapping pip
+    via ``uv pip install pip`` then retrying with ``-m pip`` if uv is absent.
     """
     flags = extra_flags or []
+    uv = shutil.which("uv")
+    if uv:
+        # --no-project: ignore pyproject.toml / uv.lock in the current directory
+        # --python: target the exact interpreter running the backend
+        return [uv, "pip", "install", "--no-project", f"--python={sys.executable}"] + flags + packages
     return [sys.executable, "-m", "pip", "install"] + flags + packages
 
 

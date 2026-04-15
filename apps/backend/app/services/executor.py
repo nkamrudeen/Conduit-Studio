@@ -201,14 +201,15 @@ def _get_python_executable() -> str:
 def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = None) -> list[str]:
     """Return the best available command to install *packages*.
 
-    uv-managed virtual environments are created without pip by default.
-    When ``uv`` is on PATH, prefer ``uv pip install`` which works in any
-    uv venv.  Otherwise fall back to ``sys.executable -m pip install``.
+    Always uses ``sys.executable -m pip install`` so packages land in the same
+    Python environment that runs the generated pipeline scripts.
+
+    ``uv pip install`` is intentionally avoided here: when run from the backend
+    directory it picks up ``pyproject.toml`` and tries to modify the project
+    venv, which causes it to be killed by Windows (STATUS_CONTROL_C_EXIT /
+    0xC000013A) during large downloads such as torch.
     """
     flags = extra_flags or []
-    uv = shutil.which("uv")
-    if uv:
-        return [uv, "pip", "install"] + flags + packages
     return [sys.executable, "-m", "pip", "install"] + flags + packages
 
 
@@ -657,16 +658,8 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any], env_va
                     await queue.put({"type": "log", "text": f"[pip] {line}", "stream": stream_name})
 
             install_cmd = _get_pip_install_cmd(packages)
-            await queue.put({"type": "log", "text": f"[Install] Running: {' '.join(install_cmd[:3])} … (large packages like torch may take several minutes)", "stream": "stdout"})
+            await queue.put({"type": "log", "text": "[Install] Running pip install… (large packages like torch may take several minutes)", "stream": "stdout"})
             install_rc = await _stream_subprocess(install_cmd, _on_install_line, combine_stderr=True)
-
-            # 0xC000013A = STATUS_CONTROL_C_EXIT — Windows killed the uv process
-            # (common with large packages like torch). Retry with plain pip.
-            _WIN_CTRL_C = 3221225786
-            if install_rc == _WIN_CTRL_C and shutil.which("uv"):
-                await queue.put({"type": "log", "text": "[Install] uv was interrupted — retrying with pip…", "stream": "stdout"})
-                fallback_cmd = [sys.executable, "-m", "pip", "install"] + packages
-                install_rc = await _stream_subprocess(fallback_cmd, _on_install_line, combine_stderr=True)
 
             if install_rc != 0:
                 await queue.put({"type": "error", "text": f"pip install failed (exit {install_rc}). Check the [pip] lines above for details."})

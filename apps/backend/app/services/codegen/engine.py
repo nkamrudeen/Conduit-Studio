@@ -113,6 +113,7 @@ _NODE_META: dict[str, dict] = {
     "llm.finetune.qlora_config": {"template": "llm/finetune_qlora_config.py.j2", "packages": ["peft", "transformers", "bitsandbytes"]},
     "llm.finetune.sft_trainer": {"template": "llm/finetune_sft_trainer.py.j2", "packages": ["trl", "peft", "transformers", "accelerate", "torch"]},
     "llm.finetune.merge_push": {"template": "llm/finetune_merge_push.py.j2", "packages": ["peft", "transformers", "huggingface_hub"]},
+    "llm.finetune.ollama_export": {"template": "llm/finetune_ollama_export.py.j2", "packages": ["transformers", "peft"]},
 }
 
 # ── Per-handle output variable names for multi-output nodes ──────────────
@@ -211,6 +212,7 @@ _NODE_OUTPUT_PREFIX: dict[str, str] = {
     "llm.finetune.qlora_config": "config",
     "llm.finetune.sft_trainer": "model",
     "llm.finetune.merge_push": "artifact",
+    "llm.finetune.ollama_export": "artifact",
 }
 
 

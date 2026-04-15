@@ -1,13 +1,26 @@
 # ── Ollama Local LLM ──────────────────────────────────────────────────────────
+# Requires: ollama running locally  →  https://ollama.com/download
+# Pull a model first: ollama pull {{ config.model | default('llama3.2') }}
 from langchain_ollama import ChatOllama
 
+{% set _model = config.custom_model if config.model == 'custom' and config.custom_model else config.model | default('llama3.2') %}
+
 llm_{{ node_id }} = ChatOllama(
-    model="{{ config.model | default('llama3.2') }}",
+    model="{{ _model }}",
     base_url="{{ config.base_url | default('http://localhost:11434') }}",
     temperature={{ config.temperature | default(0.7) }},
+    num_ctx={{ config.num_ctx | default(4096) }},
+    num_predict={{ config.num_predict | default(-1) }},
+    top_p={{ config.top_p | default(0.9) }},
+    top_k={{ config.top_k | default(40) }},
+    repeat_penalty={{ config.repeat_penalty | default(1.1) }},
+    keep_alive="{{ config.keep_alive | default('5m') }}",
+{% if config.format %}
+    format="{{ config.format }}",
+{% endif %}
 )
 {% if config.system_prompt %}
 from langchain_core.messages import SystemMessage
 _system_{{ node_id }} = SystemMessage(content="{{ config.system_prompt }}")
 {% endif %}
-print(f"[LLM] Initialized Ollama {{ config.model | default('llama3.2') }} @ {{ config.base_url | default('http://localhost:11434') }}")
+print(f"[Ollama] Model: {{ _model }} | URL: {{ config.base_url | default('http://localhost:11434') }} | ctx={{ config.num_ctx | default(4096) }}")

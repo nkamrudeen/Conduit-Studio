@@ -1,9 +1,25 @@
 # ── Fine-tuning: QLoRA Configuration (4-bit quantization) ─────────────────────
+import os as _os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, TaskType
 
-base_model_{{ node_id }} = "{{ config.base_model | default('meta-llama/Llama-3.1-8B-Instruct') }}"
+{% set source = config.model_source | default('huggingface') %}
+{% set base = config.base_model | default('microsoft/Phi-3.5-mini-instruct') %}
+
+base_model_{{ node_id }} = {{ base | tojson }}
+
+{% if source == 'huggingface' %}
+_hf_token_{{ node_id }} = _os.environ.get("{{ config.hf_token_env | default('HF_TOKEN') }}", "")
+_load_kwargs_{{ node_id }} = {"token": _hf_token_{{ node_id }}} if _hf_token_{{ node_id }} else {}
+print(f"[QLoRAConfig] Loading from HuggingFace: {base_model_{{ node_id }}}{'  (authenticated)' if _hf_token_{{ node_id }} else '  (no token — gated models will fail)'}")
+{% elif source == 'local_path' %}
+_load_kwargs_{{ node_id }} = {"local_files_only": True}
+print(f"[QLoRAConfig] Loading from local path: {base_model_{{ node_id }}}")
+{% elif source == 'ollama_export' %}
+_load_kwargs_{{ node_id }} = {"local_files_only": True}
+print(f"[QLoRAConfig] Loading Ollama-exported model from: {base_model_{{ node_id }}}")
+{% endif %}
 
 _bnb_{{ node_id }} = BitsAndBytesConfig(
     load_in_4bit={{ config.load_in_4bit | default(True) | tojson }},
@@ -12,7 +28,7 @@ _bnb_{{ node_id }} = BitsAndBytesConfig(
     bnb_4bit_use_double_quant={{ config.use_nested_quant | default(True) | tojson }},
 )
 
-tokenizer_{{ node_id }} = AutoTokenizer.from_pretrained(base_model_{{ node_id }}, use_fast=True)
+tokenizer_{{ node_id }} = AutoTokenizer.from_pretrained(base_model_{{ node_id }}, use_fast=True, **_load_kwargs_{{ node_id }})
 if tokenizer_{{ node_id }}.pad_token is None:
     tokenizer_{{ node_id }}.pad_token = tokenizer_{{ node_id }}.eos_token
 
@@ -20,6 +36,7 @@ model_base_{{ node_id }} = AutoModelForCausalLM.from_pretrained(
     base_model_{{ node_id }},
     quantization_config=_bnb_{{ node_id }},
     device_map="auto",
+    **_load_kwargs_{{ node_id }},
 )
 model_base_{{ node_id }}.config.use_cache = False
 model_base_{{ node_id }}.config.pretraining_tp = 1

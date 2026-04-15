@@ -1,0 +1,93 @@
+# ── Fine-tuning: Export to Ollama ─────────────────────────────────────────────
+# Merges LoRA adapter → saves HF weights → converts to GGUF → creates Modelfile
+import os as _os
+import subprocess as _sp
+import shutil as _sh
+from pathlib import Path as _Path
+
+{% set out_dir = config.output_dir | default('./ollama_export') %}
+{% set model_name = config.model_name | default('my-finetuned-model') %}
+{% set quant = config.quantization | default('q4_k_m') %}
+
+_export_dir = _Path({{ out_dir | tojson }}).resolve()
+_hf_dir     = _export_dir / "hf_weights"
+_gguf_path  = _export_dir / "{{ model_name }}.gguf"
+_modelfile  = _export_dir / "Modelfile"
+
+_export_dir.mkdir(parents=True, exist_ok=True)
+
+# ── 1. Merge adapter weights into the base model ──────────────────────────────
+print("[OllamaExport] Merging LoRA adapter into base model…")
+{% set _input = input_var %}
+if hasattr({{ _input }}, 'merge_and_unload'):
+    _merged = {{ _input }}.merge_and_unload()
+else:
+    _merged = {{ _input }}
+_merged.save_pretrained(str(_hf_dir))
+
+# Save tokenizer too (grab it from the model's name_or_path)
+from transformers import AutoTokenizer as _AT
+_tok = _AT.from_pretrained(_merged.config._name_or_path if hasattr(_merged.config, '_name_or_path') else str(_hf_dir))
+_tok.save_pretrained(str(_hf_dir))
+print(f"[OllamaExport] HF weights saved → {_hf_dir}")
+
+# ── 2. Convert to GGUF via llama.cpp convert script ──────────────────────────
+print(f"[OllamaExport] Converting to GGUF ({{ quant }})…")
+_llama_cpp = _sh.which("llama-quantize") or _sh.which("llama-gguf-split")
+_convert_script = _Path(__file__).parent.parent / "llama.cpp" / "convert_hf_to_gguf.py"
+
+if _convert_script.exists():
+    _sp.run([
+        "python", str(_convert_script), str(_hf_dir),
+        "--outtype", "f16",
+        "--outfile", str(_export_dir / "model-f16.gguf"),
+    ], check=True)
+    # Quantize
+    if _sh.which("llama-quantize"):
+        _sp.run([
+            "llama-quantize",
+            str(_export_dir / "model-f16.gguf"),
+            str(_gguf_path),
+            "{{ quant }}",
+        ], check=True)
+        print(f"[OllamaExport] GGUF ({{ quant }}) saved → {_gguf_path}")
+    else:
+        _gguf_path = _export_dir / "model-f16.gguf"
+        print("[OllamaExport] llama-quantize not found — using f16 GGUF.")
+else:
+    print("[OllamaExport] llama.cpp convert script not found.")
+    print("  Install llama.cpp: https://github.com/ggerganov/llama.cpp")
+    print(f"  Then convert manually: python convert_hf_to_gguf.py {_hf_dir}")
+    _gguf_path = _export_dir / "{{ model_name }}.gguf"  # placeholder path
+
+# ── 3. Write Ollama Modelfile ─────────────────────────────────────────────────
+_modelfile_content = f"""FROM {_gguf_path}
+
+SYSTEM \"\"\"{{ config.system_prompt | default('You are a helpful assistant.') }}\"\"\"
+
+PARAMETER temperature {{ config.temperature | default(0.7) }}
+PARAMETER num_ctx {{ config.num_ctx | default(4096) }}
+PARAMETER stop "<|end|>"
+PARAMETER stop "<|endoftext|>"
+"""
+_modelfile.write_text(_modelfile_content)
+print(f"[OllamaExport] Modelfile written → {_modelfile}")
+
+# ── 4. Register with Ollama ───────────────────────────────────────────────────
+{% if config.auto_create | default(True) %}
+if _sh.which("ollama"):
+    print(f"[OllamaExport] Running: ollama create {{ model_name }} -f {_modelfile}")
+    _rc = _sp.run(["ollama", "create", "{{ model_name }}", "-f", str(_modelfile)], capture_output=False).returncode
+    if _rc == 0:
+        print(f"[OllamaExport] ✓ Model registered. Run with:  ollama run {{ model_name }}")
+    else:
+        print(f"[OllamaExport] ollama create failed (exit {_rc}) — run manually:")
+        print(f"  ollama create {{ model_name }} -f {_modelfile}")
+else:
+    print("[OllamaExport] Ollama not found on PATH. Register manually:")
+    print(f"  ollama create {{ model_name }} -f {_modelfile}")
+{% else %}
+print("[OllamaExport] Skipping auto-register. To use the model:")
+print(f"  ollama create {{ model_name }} -f {_modelfile}")
+print(f"  ollama run {{ model_name }}")
+{% endif %}

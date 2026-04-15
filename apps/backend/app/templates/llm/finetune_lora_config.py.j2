@@ -1,10 +1,28 @@
 # ── Fine-tuning: LoRA Configuration ──────────────────────────────────────────
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+import os as _os
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, TaskType, get_peft_model
 
-base_model_{{ node_id }} = "{{ config.base_model | default('meta-llama/Llama-3.2-1B-Instruct') }}"
+{% set source = config.model_source | default('huggingface') %}
+{% set base = config.base_model | default('microsoft/Phi-3.5-mini-instruct') %}
 
-tokenizer_{{ node_id }} = AutoTokenizer.from_pretrained(base_model_{{ node_id }}, use_fast=True)
+base_model_{{ node_id }} = {{ base | tojson }}
+
+{% if source == 'huggingface' %}
+# Inject HF token for gated models (Llama, Gemma, etc.)
+_hf_token_{{ node_id }} = _os.environ.get("{{ config.hf_token_env | default('HF_TOKEN') }}", "")
+_load_kwargs_{{ node_id }} = {"token": _hf_token_{{ node_id }}} if _hf_token_{{ node_id }} else {}
+print(f"[LoRAConfig] Loading from HuggingFace: {base_model_{{ node_id }}}{'  (authenticated)' if _hf_token_{{ node_id }} else '  (no token — gated models will fail)'}")
+{% elif source == 'local_path' %}
+_load_kwargs_{{ node_id }} = {"local_files_only": True}
+print(f"[LoRAConfig] Loading from local path: {base_model_{{ node_id }}}")
+{% elif source == 'ollama_export' %}
+# Ollama export path: run  ollama_export node first to get HF-format weights
+_load_kwargs_{{ node_id }} = {"local_files_only": True}
+print(f"[LoRAConfig] Loading Ollama-exported model from: {base_model_{{ node_id }}}")
+{% endif %}
+
+tokenizer_{{ node_id }} = AutoTokenizer.from_pretrained(base_model_{{ node_id }}, use_fast=True, **_load_kwargs_{{ node_id }})
 if tokenizer_{{ node_id }}.pad_token is None:
     tokenizer_{{ node_id }}.pad_token = tokenizer_{{ node_id }}.eos_token
 
@@ -12,6 +30,7 @@ model_base_{{ node_id }} = AutoModelForCausalLM.from_pretrained(
     base_model_{{ node_id }},
     device_map="auto",
     torch_dtype="auto",
+    **_load_kwargs_{{ node_id }},
 )
 
 config_{{ node_id }} = LoraConfig(
@@ -22,4 +41,4 @@ config_{{ node_id }} = LoraConfig(
     bias="{{ config.bias | default('none') }}",
     task_type=TaskType.{{ config.task_type | default('CAUSAL_LM') }},
 )
-print(f"[LoRAConfig] Base model: {base_model_{{ node_id }}} | rank={config_{{ node_id }}.r}, alpha={config_{{ node_id }}.lora_alpha}")
+print(f"[LoRAConfig] Base: {base_model_{{ node_id }}} | rank={config_{{ node_id }}.r}, alpha={config_{{ node_id }}.lora_alpha}")

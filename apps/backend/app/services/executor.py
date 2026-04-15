@@ -656,12 +656,20 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any], env_va
                 if line:
                     await queue.put({"type": "log", "text": f"[pip] {line}", "stream": stream_name})
 
-            install_rc = await _stream_subprocess(
-                _get_pip_install_cmd(packages, ["--quiet"]),
-                _on_install_line,
-            )
+            install_cmd = _get_pip_install_cmd(packages)
+            await queue.put({"type": "log", "text": f"[Install] Running: {' '.join(install_cmd[:3])} … (large packages like torch may take several minutes)", "stream": "stdout"})
+            install_rc = await _stream_subprocess(install_cmd, _on_install_line, combine_stderr=True)
+
+            # 0xC000013A = STATUS_CONTROL_C_EXIT — Windows killed the uv process
+            # (common with large packages like torch). Retry with plain pip.
+            _WIN_CTRL_C = 3221225786
+            if install_rc == _WIN_CTRL_C and shutil.which("uv"):
+                await queue.put({"type": "log", "text": "[Install] uv was interrupted — retrying with pip…", "stream": "stdout"})
+                fallback_cmd = [sys.executable, "-m", "pip", "install"] + packages
+                install_rc = await _stream_subprocess(fallback_cmd, _on_install_line, combine_stderr=True)
+
             if install_rc != 0:
-                await queue.put({"type": "error", "text": f"pip install failed (exit {install_rc})"})
+                await queue.put({"type": "error", "text": f"pip install failed (exit {install_rc}). Check the [pip] lines above for details."})
                 _run_status[run_id] = "error"
                 await queue.put({"type": "status", "status": "error", "node_id": None})
                 await queue.put({"type": "done"})
@@ -944,8 +952,9 @@ async def execute_pipeline_kubeflow(
                 await queue.put({"type": "log", "text": f"[pip] {line}", "stream": sn})
 
         await _stream_subprocess(
-            _get_pip_install_cmd(["kfp>=2.0"], ["--quiet"]),
+            _get_pip_install_cmd(["kfp>=2.0"]),
             _on_pip,
+            combine_stderr=True,
         )
 
         # ── 3. Compile to pipeline.yaml ───────────────────────────────────

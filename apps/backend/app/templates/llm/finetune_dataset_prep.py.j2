@@ -1,4 +1,7 @@
 # ── Fine-tuning: Dataset Preparation ─────────────────────────────────────────
+import os as _os
+_os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+_os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 from datasets import load_dataset, Dataset
 import pandas as pd
 
@@ -41,7 +44,7 @@ def _format_{{ node_id }}(example):
 {% endif %}
     return {"text": prompt}
 
-dataset_{{ node_id }} = _raw_{{ node_id }}.map(_format_{{ node_id }}, remove_columns=_raw_{{ node_id }}.column_names)
+dataset_{{ node_id }} = _raw_{{ node_id }}.map(_format_{{ node_id }}, remove_columns=_raw_{{ node_id }}.column_names, desc="Formatting")
 train_size = int(len(dataset_{{ node_id }}) * {{ config.train_split | default(0.95) }})
 dataset_{{ node_id }} = dataset_{{ node_id }}.train_test_split(test_size=len(dataset_{{ node_id }}) - train_size)
 print(f"[DatasetPrep] Train: {len(dataset_{{ node_id }}['train'])} | Eval: {len(dataset_{{ node_id }}['test'])}")

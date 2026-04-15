@@ -87,7 +87,16 @@ async def _stream_subprocess(
 
     # Force UTF-8 I/O so emoji / non-ASCII chars from libraries (e.g. MLflow's
     # 🏃 run URL line) don't crash with UnicodeEncodeError on Windows cp1252.
-    run_env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", **(extra_env or {})}
+    run_env = {
+        **os.environ,
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
+        # Suppress tqdm progress bars — they crash in piped subprocesses on Windows
+        # (tqdm.asyncio tries to render inside a non-interactive stdout stream).
+        "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+        "TOKENIZERS_PARALLELISM": "false",
+        **(extra_env or {}),
+    }
     stderr_opt = subprocess.STDOUT if combine_stderr else subprocess.PIPE
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr_opt, cwd=cwd, env=run_env)
 

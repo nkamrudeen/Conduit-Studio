@@ -202,17 +202,14 @@ def _get_pip_install_cmd(packages: list[str], extra_flags: list[str] | None = No
     """Return the best available command to install *packages* into the active venv.
 
     uv venvs are created without pip by default, so ``sys.executable -m pip``
-    fails.  Use ``uv pip install --no-project`` instead — the ``--no-project``
-    flag prevents uv from reading pyproject.toml (which was causing it to be
-    killed on Windows during large downloads).  Falls back to bootstrapping pip
-    via ``uv pip install pip`` then retrying with ``-m pip`` if uv is absent.
+    fails.  We use ``uv pip install --python=<exe>`` but run the subprocess
+    from a temp directory (see callers) so uv never discovers pyproject.toml.
+    Falls back to ``-m pip`` when uv is not on PATH.
     """
     flags = extra_flags or []
     uv = shutil.which("uv")
     if uv:
-        # --no-project: ignore pyproject.toml / uv.lock in the current directory
-        # --python: target the exact interpreter running the backend
-        return [uv, "pip", "install", "--no-project", f"--python={sys.executable}"] + flags + packages
+        return [uv, "pip", "install", f"--python={sys.executable}"] + flags + packages
     return [sys.executable, "-m", "pip", "install"] + flags + packages
 
 
@@ -662,7 +659,8 @@ async def execute_pipeline_with_install(run_id: str, dag: dict[str, Any], env_va
 
             install_cmd = _get_pip_install_cmd(packages)
             await queue.put({"type": "log", "text": "[Install] Running pip install… (large packages like torch may take several minutes)", "stream": "stdout"})
-            install_rc = await _stream_subprocess(install_cmd, _on_install_line, combine_stderr=True)
+            # Run from a temp dir so uv doesn't discover the backend pyproject.toml
+            install_rc = await _stream_subprocess(install_cmd, _on_install_line, combine_stderr=True, cwd=tempfile.gettempdir())
 
             if install_rc != 0:
                 await queue.put({"type": "error", "text": f"pip install failed (exit {install_rc}). Check the [pip] lines above for details."})
@@ -951,6 +949,7 @@ async def execute_pipeline_kubeflow(
             _get_pip_install_cmd(["kfp>=2.0"]),
             _on_pip,
             combine_stderr=True,
+            cwd=tempfile.gettempdir(),
         )
 
         # ── 3. Compile to pipeline.yaml ───────────────────────────────────

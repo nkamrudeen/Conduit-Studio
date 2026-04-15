@@ -98,7 +98,19 @@ async def _stream_subprocess(
         **(extra_env or {}),
     }
     stderr_opt = subprocess.STDOUT if combine_stderr else subprocess.PIPE
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr_opt, cwd=cwd, env=run_env)
+    # On Windows, subprocesses share the parent's console process group and
+    # receive Ctrl+C / Ctrl+Break signals forwarded from uvicorn.  This kills
+    # long-running installs (uv exits with 0xC000013A = STATUS_CONTROL_C_EXIT).
+    # CREATE_NEW_PROCESS_GROUP detaches the child from the parent's signal group.
+    creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=stderr_opt,
+        cwd=cwd,
+        env=run_env,
+        creationflags=creation_flags,
+    )
 
     # One sentinel per open stream.
     num_sentinels = 1 if combine_stderr else 2
